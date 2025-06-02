@@ -1,20 +1,24 @@
 version: '3.8'
 
 services:
+  # Main API Service
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: memory-api
+    container_name: unified-memory-api
     ports:
-      - "${SERVER_IP:-10.10.20.100}:8000:8000"
+      - "${SERVER_IP:-10.10.20.100}:${PORT:-8000}:8000"
     environment:
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://default:${REDIS_PASSWORD}@redis:6379
+      - NEO4J_URL=bolt://neo4j:7687
       - HOST=0.0.0.0
     env_file:
       - .env.production
     depends_on:
       redis:
+        condition: service_healthy
+      neo4j:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -23,19 +27,23 @@ services:
       timeout: 10s
       retries: 3
     volumes:
-      - ./logs:/app/logs
+      - ./logs:/var/log/unified-memory
+      - ${BASIC_MEMORY_PATH:-./data/obsidian}:/data/obsidian
+      - ./certs:/certs:ro
     networks:
       - memory-net
 
+  # MCP Server
   mcp:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: memory-mcp
+    container_name: unified-memory-mcp
     ports:
-      - "${SERVER_IP:-10.10.20.100}:9000:9000"
+      - "${SERVER_IP:-10.10.20.100}:${MCP_PORT:-9000}:9000"
     environment:
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://default:${REDIS_PASSWORD}@redis:6379
+      - NEO4J_URL=bolt://neo4j:7687
       - HOST=0.0.0.0
     env_file:
       - .env.production
@@ -43,34 +51,46 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      neo4j:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - memory-net
 
+  # Background Task Worker
   task-worker:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: memory-worker
+    container_name: unified-memory-worker
     environment:
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://default:${REDIS_PASSWORD}@redis:6379
+      - NEO4J_URL=bolt://neo4j:7687
     env_file:
       - .env.production
     command: ["uv", "run", "agent-memory", "task-worker", "--concurrency", "5"]
     depends_on:
       redis:
         condition: service_healthy
+      neo4j:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - memory-net
+    volumes:
+      - ./logs:/var/log/unified-memory
+      - ${BASIC_MEMORY_PATH:-./data/obsidian}:/data/obsidian
 
+  # Redis Memory Server
   redis:
     image: redis/redis-stack:latest
-    container_name: memory-redis
+    container_name: unified-memory-redis
     volumes:
       - redis_data:/data
       - ./config/redis.conf:/usr/local/etc/redis/redis.conf
     command: redis-stack-server --save 60 1 --loglevel warning --requirepass ${REDIS_PASSWORD:-your-redis-password}
+    environment:
+      - REDIS_ARGS=--requirepass ${REDIS_PASSWORD:-your-redis-password}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
@@ -82,9 +102,59 @@ services:
     ports:
       - "127.0.0.1:6379:6379"  # Only localhost access
 
+  # Neo4j Graph Database
+  neo4j:
+    image: neo4j:5-enterprise
+    container_name: unified-memory-neo4j
+    environment:
+      - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-your-neo4j-password}
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+      - NEO4J_dbms_memory_pagecache_size=2G
+      - NEO4J_dbms_memory_heap_initial__size=2G
+      - NEO4J_dbms_memory_heap_max__size=4G
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_security_allow__csv__import__from__file__urls=false
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    ports:
+      - "127.0.0.1:7474:7474"  # Browser
+      - "127.0.0.1:7687:7687"  # Bolt
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - memory-net
+
+  # Nginx Reverse Proxy (Optional - for SSL)
+  nginx:
+    image: nginx:alpine
+    container_name: unified-memory-nginx
+    ports:
+      - "${SERVER_IP:-10.10.20.100}:443:443"
+      - "${SERVER_IP:-10.10.20.100}:80:80"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+      - ./certs:/etc/ssl/certs:ro
+    depends_on:
+      - api
+      - mcp
+    restart: unless-stopped
+    networks:
+      - memory-net
+    profiles:
+      - ssl
+
+  # Monitoring - Prometheus
   prometheus:
     image: prom/prometheus
-    container_name: memory-prometheus
+    container_name: unified-memory-prometheus
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -93,22 +163,71 @@ services:
     networks:
       - memory-net
     restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
 
+  # Monitoring - Grafana
   grafana:
     image: grafana/grafana
-    container_name: memory-grafana
+    container_name: unified-memory-grafana
     ports:
       - "${SERVER_IP:-10.10.20.100}:3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=secure-grafana-password
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
+      - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
     networks:
       - memory-net
     restart: unless-stopped
 
+  # Redis Insight (Development/Debug)
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: unified-memory-redis-insight
+    ports:
+      - "127.0.0.1:18001:8001"
+    networks:
+      - memory-net
+    restart: unless-stopped
+    profiles:
+      - debug
+
+  # Backup Service
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: unified-memory-backup
+    environment:
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ${BACKUP_PATH:-./backups}:/backups
+      - redis_data:/data/redis:ro
+      - neo4j_data:/data/neo4j:ro
+      - ${BASIC_MEMORY_PATH:-./data/obsidian}:/data/obsidian:ro
+    networks:
+      - memory-net
+    restart: unless-stopped
+    profiles:
+      - backup
+
 volumes:
   redis_data:
+    driver: local
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  neo4j_import:
+    driver: local
+  neo4j_plugins:
     driver: local
   prometheus_data:
     driver: local
@@ -118,3 +237,6 @@ volumes:
 networks:
   memory-net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
