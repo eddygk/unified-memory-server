@@ -1,6 +1,6 @@
-# 🧠 Unified Memory Server
+# 🔮 Unified Memory Server
 
-A comprehensive AI memory server integrating Neo4j, Basic Memory, and Redis Memory Server for multi-agent access. This project provides graph-based relationships, structured knowledge persistence, and conversational context with semantic search capabilities.
+A unified AI memory server integrating Neo4j, Basic Memory, and Redis Memory Server for multi-agent access. This project provides graph-based relationships, structured knowledge persistence, and conversational context with semantic search capabilities.
 
 ## 🎯 Overview
 
@@ -15,35 +15,34 @@ The Unified Memory Server combines three complementary memory systems to provide
 - **Eddy Kawira** ([@eddygk](https://github.com/eddygk))
 - **Claude AI** (Anthropic) - Architecture design and implementation guidance
 
-## 🚀 Features
+## 🚀 Key Features
 
-### Core Memory Components
+### Based on Redis Agent Memory Server
+
+This project extends the [Redis Agent Memory Server](https://github.com/redis-developer/agent-memory-server) with:
 
 - **Working Memory**: Session-scoped storage with automatic summarization
-- **Long-Term Memory**: Persistent storage with semantic search capabilities  
+- **Long-Term Memory**: Persistent storage with semantic search capabilities
 - **Graph Relationships**: Entity and relationship modeling with Neo4j
-- **Structured Notes**: Markdown-based knowledge persistence
+- **Structured Notes**: Markdown-based knowledge persistence with Basic Memory
 - **Multi-Agent Support**: Namespace isolation for multiple AI agents
 - **Authentication**: OAuth2/JWT support for secure multi-client access
 
-### Key Capabilities
+### Additional Integrations
 
-- Automatic memory promotion from working to long-term storage
-- Semantic search across all memory types
-- Topic modeling and entity extraction
-- Memory deduplication and compaction
-- Cross-platform support (Windows, Mac, Linux)
-- Docker-based deployment for easy scaling
+- **Neo4j Knowledge Graph**: Natural language queries and relationship traversal
+- **Basic Memory (Obsidian)**: Persistent markdown notes and canvases
+- **Cross-System Synchronization**: Unified access across all memory systems
 
 ## 📋 Prerequisites
 
 - Docker and Docker Compose
 - Redis Stack (included in Docker setup)
-- Neo4j 5.x (included in Docker setup)
+- Neo4j 5.x (for graph features)
 - OAuth2 provider (Auth0, AWS Cognito, etc.)
 - Python 3.12+ (for development)
 
-## 🛠️ Quick Start
+## 🏃‍♂️ Quick Start
 
 1. Clone the repository:
 ```bash
@@ -70,11 +69,12 @@ curl http://localhost:8000/health
 
 ## 📚 Documentation
 
-- [Deployment Guide](docs/deployment.md) - Complete deployment instructions
+- [Deployment Guide](docs/deployment.md) - Complete deployment instructions for your subnet
 - [Client Configuration](docs/client-config.md) - Setting up Claude and other AI agents
 - [API Reference](docs/api.md) - REST API and MCP endpoints
 - [Memory Selection Guide](docs/memory-selection.md) - When to use each memory system
 - [Security Guide](docs/security.md) - Authentication and security best practices
+- [MCP Proxy Client](docs/mcp-proxy.md) - OAuth2 proxy for Claude Desktop
 
 ## 🔧 Configuration
 
@@ -100,60 +100,64 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # Memory Configuration
 LONG_TERM_MEMORY=true
 WINDOW_SIZE=20
-ENABLE_TOPIC_EXTRACTION=true
+EMABLE_TOPIC_EXTRACTION=true
 ENABLE_NER=true
+
+# Neo4j Configuration (optional)
+NEO4J_URL=bolt://neo4j:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your-password
+
+# Basic Memory Configuration (optional)
+BASIC_MEMORY_PATH=/path/to/obsidian/vault
 ```
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        AI Agents (Clients)                       │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│  │   Claude    │  │    GPT-4    │  │   Custom    │            │
-│  │  (Windows)  │  │    (Mac)    │  │   Agents    │            │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘            │
-└─────────┼─────────────────┼─────────────────┼──────────────────┘
-          │                 │                 │
-          └─────────────────┴─────────────────┘
-                            │
-                   ┌────────▼────────┐
-                   │  Auth Proxy     │
-                   │  (OAuth2/JWT)   │
-                   └────────┬────────┘
-                            │
-          ┌─────────────────┴─────────────────┐
-          │         Unified Memory API         │
-          │    ┌─────────┐    ┌─────────┐    │
-          │    │   REST  │    │   MCP   │    │
-          │    │  :8000  │    │  :9000  │    │
-          │    └────┬────┘    └────┬────┘    │
-          └─────────┼──────────────┼──────────┘
-                    │              │
-     ┌──────────────┴──────────────┴──────────────┐
-     │          Memory System Selector             │
-     └──────┬───────────────┬──────────────┬──────┘
-            │               │              │
-     ┌──────▼──────┐ ┌──────▼──────┐ ┌────▼─────┐
-     │    Neo4j    │ │Basic Memory │ │  Redis   │
-     │  (Graph DB) │ │ (Markdown)  │ │ (Cache)  │
-     └─────────────┘ └─────────────┘ └──────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                    AI Agents (Clients)                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │   Claude     │  │    GPT-4     │  │   Custom     │        │
+│  │  (Windows)   │  │    (Mac)     │  │   Agents     │        │
+│  └──────────┬──────┘  └──────┬──────┘  └──────┬──────┘        │
+└─────────────┼─────────────────┼─────────────────┼─────────────┘
+              │                 │                 │
+              └─────────────────┴─────────────────┘
+                                │
+                    ┌──────────▼──────────┐
+                    │   Auth Proxy        │
+                    │  (OAuth2/JWT)       │
+                    └──────────┬──────────┘
+                              │
+        ┌─────────────────────┴─────────────────────┐
+        │        Unified Memory API                 │
+        │    ┌──────────┐    ┌──────────┐          │
+        │    │  REST    │    │   MCP    │          │
+        │    │ :8000    │    │  :9000   │          │
+        │    └──────┬──────┘    └──────┬──────┘    │
+        └───────────┼───────────────────┼───────────┘
+                    │                   │
+    ┌───────────────┴───────────────────┴───────────────┐
+    │          Memory System Selector                    │
+    └───────┬───────────────────┬───────────────┬───────┘
+            │                   │               │
+    ┌───────▼────────┐ ┌───────▼────────┐ ┌────▼──────┐
+    │    Neo4j       │ │Basic Memory    │ │  Redis    │
+    │  (Graph DB)    │ │ (Markdown)     │ │ (Cache)   │
+    └────────────────┘ └────────────────┘ └───────────┘
 ```
 
-## 🚀 Deployment Options
+## 🌐 Network Deployment (10.10.20.0/24)
 
-### Local Development
-```bash
-docker-compose up
-```
+This server is designed to run on a dedicated machine in your subnet:
 
-### Production Deployment (10.10.20.100)
-```bash
-docker-compose -f docker-compose.prod.yml up -d
-```
+- **Server**: 10.10.20.100 (example)
+- **API Port**: 8000
+- **MCP Port**: 9000
+- **Monitoring**: Grafana on port 3000
 
-### Kubernetes Deployment
-See [k8s/README.md](k8s/README.md) for Kubernetes deployment instructions.
+See [deployment guide](docs/deployment.md) for detailed subnet setup.
 
 ## 🔌 Client Integration
 
@@ -232,7 +236,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Issues: [GitHub Issues](https://github.com/eddygk/unified-memory-server/issues)
 - Discussions: [GitHub Discussions](https://github.com/eddygk/unified-memory-server/discussions)
-- Email: eddy@your-domain.com
 
 ---
 

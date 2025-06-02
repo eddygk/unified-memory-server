@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: memory-api
+    ports:
+      - "${SERVER_IP:-10.10.20.100}:8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - HOST=0.0.0.0
+    env_file:
+      - .env.production
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - memory-net
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: memory-mcp
+    ports:
+      - "${SERVER_IP:-10.10.20.100}:9000:9000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - HOST=0.0.0.0
+    env_file:
+      - .env.production
+    command: ["uv", "run", "agent-memory", "mcp", "--mode", "sse", "--port", "9000"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - memory-net
+
+  task-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: memory-worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - .env.production
+    command: ["uv", "run", "agent-memory", "task-worker", "--concurrency", "5"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - memory-net
+
+  redis:
+    image: redis/redis-stack:latest
+    container_name: memory-redis
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-stack-server --save 60 1 --loglevel warning --requirepass ${REDIS_PASSWORD:-your-redis-password}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - memory-net
+    ports:
+      - "127.0.0.1:6379:6379"  # Only localhost access
+
+  prometheus:
+    image: prom/prometheus
+    container_name: memory-prometheus
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks:
+      - memory-net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    container_name: memory-grafana
+    ports:
+      - "${SERVER_IP:-10.10.20.100}:3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=secure-grafana-password
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - memory-net
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  memory-net:
+    driver: bridge
