@@ -7,7 +7,7 @@ The Unified Memory Server provides three complementary memory systems, each opti
 ## Quick Selection Matrix
 
 | Use Case | Primary System | Secondary System | Rationale |
-|----------|----------------|------------------|-----------|
+|-----------|----------------|------------------|-----------|
 | User identity & profile | Neo4j | Redis Memory | Graph relationships with cached access |
 | Entity relationships | Neo4j | - | Native graph traversal capabilities |
 | Conversation history | Redis Memory | - | Optimized for temporal data |
@@ -21,13 +21,13 @@ The Unified Memory Server provides three complementary memory systems, each opti
 
 ```
 IF task involves relationships or connections between entities
-    → USE Neo4j (create_entities, create_relations, read_neo4j_cypher)
+    → USE Neo4j (local__neo4j-memory__create_entities, local__neo4j-memory__create_relations, local__neo4j-cypher__read_neo4j_cypher)
     
 ELSE IF task requires comprehensive documentation or structured notes
-    → USE Basic Memory (write_note, read_note)
+    → USE Basic Memory (local__basic-memory__write_note, local__basic-memory__read_note)
     
 ELSE IF task needs conversational context or semantic search
-    → USE Redis Memory Server (hydrate_memory_prompt, search_long_term_memory)
+    → USE Redis Memory Server (local__redis-memory-server__hydrate_memory_prompt, local__redis-memory-server__search_long_term_memory)
 ```
 
 ## Detailed System Capabilities
@@ -52,10 +52,10 @@ ELSE IF task needs conversational context or semantic search
 ```python
 # Finding all projects a user is involved in
 query = "Find all projects where user Eddy has any role"
-result = read_neo4j_cypher(query=query, query_type="natural_language")
+result = local__neo4j-cypher__read_neo4j_cypher(query=query, query_type="natural_language")
 
 # Creating entity relationships
-create_relations(relations=[{
+local__neo4j-memory__create_relations(relations=[{
     "source": "Eddy",
     "target": "Unified Memory Project",
     "relationType": "CONTRIBUTES_TO"
@@ -81,7 +81,7 @@ create_relations(relations=[{
 **Example Use Cases:**
 ```python
 # Store conversation context
-create_long_term_memories(payload={
+local__redis-memory-server__create_long_term_memories(payload={
     "memories": [{
         "text": "User prefers dark mode and serif fonts",
         "namespace": "preferences",
@@ -90,7 +90,7 @@ create_long_term_memories(payload={
 })
 
 # Semantic search
-results = search_long_term_memory(payload={
+results = local__redis-memory-server__search_long_term_memory(payload={
     "text": "What are the user's UI preferences?",
     "namespace": {"eq": "preferences"},
     "limit": 5
@@ -116,14 +116,14 @@ results = search_long_term_memory(payload={
 **Example Use Cases:**
 ```python
 # Create structured documentation
-write_note(
+local__basic-memory__write_note(
     title="System Architecture",
     content="# System Architecture\n\n## Overview...",
     folder="docs/technical"
 )
 
 # Create visual canvas
-canvas(
+local__basic-memory__canvas(
     title="Memory System Relationships",
     nodes=[...],
     edges=[...],
@@ -136,14 +136,14 @@ canvas(
 ### Pattern 1: User Profile Management
 ```python
 # 1. Store core identity in Neo4j
-create_entities(entities=[{
+local__neo4j-memory__create_entities(entities=[{
     "name": "user_123",
     "type": "User",
     "observations": ["Name: John Doe", "Role: Developer"]
 }])
 
 # 2. Cache preferences in Redis
-create_long_term_memories(payload={
+local__redis-memory-server__create_long_term_memories(payload={
     "memories": [{
         "text": "Preferred IDE: VSCode, Theme: Dark",
         "namespace": "user_preferences",
@@ -152,7 +152,7 @@ create_long_term_memories(payload={
 })
 
 # 3. Document detailed profile in Basic Memory
-write_note(
+local__basic-memory__write_note(
     title="User Profile - John Doe",
     content="Comprehensive user documentation...",
     folder="users"
@@ -162,27 +162,27 @@ write_note(
 ### Pattern 2: Project Documentation
 ```python
 # 1. Create project entity in Neo4j
-create_entities(entities=[{
+local__neo4j-memory__create_entities(entities=[{
     "name": "Project Alpha",
     "type": "Project",
     "observations": ["Status: Active", "Team Size: 5"]
 }])
 
 # 2. Link team members
-create_relations(relations=[
+local__neo4j-memory__create_relations(relations=[
     {"source": "John Doe", "target": "Project Alpha", "relationType": "MEMBER_OF"},
     {"source": "Jane Smith", "target": "Project Alpha", "relationType": "LEADS"}
 ])
 
 # 3. Store project docs in Basic Memory
-write_note(
+local__basic-memory__write_note(
     title="Project Alpha Specification",
     content="# Project Alpha\n\n## Overview...",
     folder="projects/alpha"
 )
 
 # 4. Cache frequently accessed info
-create_long_term_memories(payload={
+local__redis-memory-server__create_long_term_memories(payload={
     "memories": [{
         "text": "Project Alpha deadline: Q2 2025, Priority: High",
         "namespace": "project_status",

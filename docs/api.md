@@ -420,7 +420,7 @@ Content-Type: application/json
 ### Error Codes
 
 | Code | HTTP Status | Description |
-|------|-------------|-------------|
+|------|-------------|--------------|
 | UNAUTHORIZED | 401 | Missing or invalid authentication |
 | FORBIDDEN | 403 | Insufficient permissions |
 | NOT_FOUND | 404 | Resource not found |
