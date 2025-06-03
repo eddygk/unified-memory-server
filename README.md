@@ -1,8 +1,17 @@
+![Neo4j Graph Overview](docs/images/ums_neo4j_overview.png)
+
 # 🎯 Unified Memory Server
 
 A unified AI memory server integrating Neo4j, Basic Memory, and Redis Memory Server for multi-agent access. This project provides graph-based relationships, structured knowledge persistence, and conversational context with semantic search capabilities.
 
 ## 🎯 Overview
+
+## 📊 Visual Overview
+
+A snapshot of the Neo4j graph database component, illustrating the types of nodes and relationships managed by the Unified Memory Server:
+
+![Neo4j Graph Overview](docs/images/ums_neo4j_overview.png)
+
 
 The Unified Memory Server combines three complementary memory systems to provide a complete memory solution for AI agents:
 
@@ -215,6 +224,14 @@ As of June 2, 2025, the system has been tested and verified operational:
 - **Redis Memory**: ✅ Long-term memories accessible, semantic search functional
 - **Basic Memory**: ✅ Notes searchable, memory:// URLs navigable
 - **Cross-System Integration**: ✅ IntegrationMap tracking cross-references
+
+### Neo4j Graph Visualization
+
+The following screenshot shows the Neo4j graph database in action with various entity types and their relationships:
+
+![Neo4j Graph Visualization](images/neo4j-graph-visualization.png)
+
+*The graph displays nodes representing different entity types (Memory, Project, Database, etc.) and their interconnected relationships, demonstrating the power of graph-based memory storage.*
 
 ### Available MCP Tools
 
