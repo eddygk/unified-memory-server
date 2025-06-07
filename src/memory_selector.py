@@ -3,9 +3,15 @@ Memory System Selector
 Implements intelligent routing to appropriate memory systems based on task type
 """
 import logging
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 import time
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +50,19 @@ class TaskType(Enum):
 class MemorySelector:
     """Selects appropriate memory system based on task characteristics"""
     
-    def __init__(self, cab_tracker=None):
+    def __init__(self, cab_tracker=None, config_path=None):
         self.cab_tracker = cab_tracker
         self._selection_rules = self._initialize_rules()
         self._fallback_chains = self._initialize_fallback_chains()
+        
+        # Load configuration
+        self.config = self._load_config(config_path)
+        self._validate_config()
+        
+        # Initialize clients (placeholders for now)
+        self._redis_client = None
+        self._basic_memory_client = None
+        self._neo4j_client = None
         
     def _initialize_rules(self) -> Dict[TaskType, MemorySystem]:
         """Initialize task type to memory system mapping"""
@@ -78,6 +93,244 @@ class MemorySelector:
             MemorySystem.REDIS: [MemorySystem.BASIC_MEMORY, MemorySystem.NEO4J],
             MemorySystem.BASIC_MEMORY: [MemorySystem.REDIS, MemorySystem.NEO4J],
         }
+    
+    def _load_config(self, config_path: Optional[str] = None) -> Dict[str, Any]:
+        """Load configuration from .env file"""
+        config = {}
+        
+        # Load from .env file if python-dotenv is available
+        if load_dotenv is not None:
+            # Try different .env file locations
+            env_files = [
+                config_path,
+                '.env',
+                '.env.production',
+                '.env.local'
+            ]
+            
+            for env_file in env_files:
+                if env_file and os.path.exists(env_file):
+                    logger.info(f"Loading configuration from {env_file}")
+                    load_dotenv(env_file)
+                    break
+            else:
+                logger.warning("No .env file found, using environment variables only")
+        else:
+            logger.warning("python-dotenv not available, using environment variables only")
+        
+        # Load Redis configuration
+        config['redis'] = {
+            'url': os.getenv('REDIS_URL', 'redis://localhost:6379'),
+            'password': os.getenv('REDIS_PASSWORD'),
+            'enabled': os.getenv('REDIS_ENABLED', 'true').lower() == 'true'
+        }
+        
+        # Load Neo4j configuration
+        config['neo4j'] = {
+            'url': os.getenv('NEO4J_URL', 'bolt://localhost:7687'),
+            'username': os.getenv('NEO4J_USERNAME', 'neo4j'),
+            'password': os.getenv('NEO4J_PASSWORD'),
+            'database': os.getenv('NEO4J_DATABASE', 'neo4j'),
+            'enabled': os.getenv('NEO4J_ENABLED', 'true').lower() == 'true'
+        }
+        
+        # Load Basic Memory configuration
+        config['basic_memory'] = {
+            'path': os.getenv('BASIC_MEMORY_PATH', '/data/obsidian'),
+            'url': os.getenv('BASIC_MEMORY_URL', 'http://localhost:8080'),
+            'enabled': os.getenv('BASIC_MEMORY_ENABLED', 'true').lower() == 'true'
+        }
+        
+        # Load CAB configuration
+        config['cab'] = {
+            'enabled': os.getenv('CAB_MONITORING_ENABLED', 'true').lower() == 'true',
+            'log_path': os.getenv('CAB_LOG_PATH', '/var/log/unified-memory/cab-suggestions.log')
+        }
+        
+        return config
+    
+    def _validate_config(self) -> None:
+        """Validate that essential configuration is present"""
+        missing_config = []
+        warnings = []
+        
+        # Check Redis configuration
+        if self.config['redis']['enabled']:
+            if not self.config['redis']['url']:
+                missing_config.append("REDIS_URL")
+            if not self.config['redis']['password']:
+                warnings.append("REDIS_PASSWORD not set - using default authentication")
+        
+        # Check Neo4j configuration
+        if self.config['neo4j']['enabled']:
+            if not self.config['neo4j']['url']:
+                missing_config.append("NEO4J_URL")
+            if not self.config['neo4j']['password']:
+                missing_config.append("NEO4J_PASSWORD")
+            if not self.config['neo4j']['username']:
+                warnings.append("NEO4J_USERNAME not set - using default 'neo4j'")
+        
+        # Check Basic Memory configuration
+        if self.config['basic_memory']['enabled']:
+            if not self.config['basic_memory']['path'] and not self.config['basic_memory']['url']:
+                missing_config.append("BASIC_MEMORY_PATH or BASIC_MEMORY_URL")
+        
+        # Log warnings
+        for warning in warnings:
+            logger.warning(f"Configuration warning: {warning}")
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Configuration Warning",
+                    warning,
+                    severity='LOW',
+                    context="Configuration validation"
+                )
+        
+        # Log and raise errors for missing essential config
+        if missing_config:
+            error_msg = f"Missing essential configuration: {', '.join(missing_config)}"
+            logger.error(error_msg)
+            
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Missing Configuration",
+                    error_msg,
+                    severity='HIGH',
+                    context="Essential backend connection parameters missing"
+                )
+            
+            raise ValueError(f"Configuration validation failed: {error_msg}")
+        
+        logger.info("Configuration validation passed")
+    
+    def _get_redis_client(self):
+        """Get Redis client instance"""
+        if not self._redis_client and self.config['redis']['enabled']:
+            try:
+                # This is a placeholder for actual Redis client instantiation
+                # In a full implementation, this would import and configure MemoryAPIClient
+                logger.info("Initializing Redis client")
+                
+                redis_config = self.config['redis']
+                logger.info(f"Redis URL: {redis_config['url']}")
+                
+                # Placeholder for actual client creation
+                # from memory_api_client import MemoryAPIClient, MemoryClientConfig
+                # self._redis_client = MemoryAPIClient(MemoryClientConfig(
+                #     url=redis_config['url'],
+                #     password=redis_config['password']
+                # ))
+                
+                # For now, just log that we would create the client
+                self._redis_client = f"RedisClient({redis_config['url']})"
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Client Initialization",
+                        "Redis client initialized successfully",
+                        severity='LOW',
+                        context="Backend client setup"
+                    )
+                
+            except Exception as e:
+                error_msg = f"Failed to initialize Redis client: {e}"
+                logger.error(error_msg)
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Client Initialization Error",
+                        error_msg,
+                        severity='HIGH',
+                        context="Redis backend unavailable"
+                    )
+                raise
+        
+        return self._redis_client
+    
+    def _get_basic_memory_client(self):
+        """Get Basic Memory client instance"""
+        if not self._basic_memory_client and self.config['basic_memory']['enabled']:
+            try:
+                # This is a placeholder for actual Basic Memory client instantiation
+                logger.info("Initializing Basic Memory client")
+                
+                basic_config = self.config['basic_memory']
+                logger.info(f"Basic Memory path: {basic_config['path']}")
+                
+                # Placeholder for actual client creation
+                # import httpx or requests for REST API interaction
+                # self._basic_memory_client = httpx.Client(base_url=basic_config['url'])
+                
+                # For now, just log that we would create the client
+                self._basic_memory_client = f"BasicMemoryClient({basic_config['path']})"
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Client Initialization",
+                        "Basic Memory client initialized successfully",
+                        severity='LOW',
+                        context="Backend client setup"
+                    )
+                
+            except Exception as e:
+                error_msg = f"Failed to initialize Basic Memory client: {e}"
+                logger.error(error_msg)
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Client Initialization Error",
+                        error_msg,
+                        severity='HIGH',
+                        context="Basic Memory backend unavailable"
+                    )
+                raise
+        
+        return self._basic_memory_client
+    
+    def _get_neo4j_client(self):
+        """Get Neo4j client instance"""
+        if not self._neo4j_client and self.config['neo4j']['enabled']:
+            try:
+                # This is a placeholder for actual Neo4j MCP client instantiation
+                logger.info("Initializing Neo4j client")
+                
+                neo4j_config = self.config['neo4j']
+                logger.info(f"Neo4j URL: {neo4j_config['url']}")
+                
+                # Placeholder for actual MCP client creation
+                # This would create a helper/wrapper for MCP requests to Neo4j
+                # self._neo4j_client = Neo4jMCPClient(
+                #     url=neo4j_config['url'],
+                #     username=neo4j_config['username'],
+                #     password=neo4j_config['password'],
+                #     database=neo4j_config['database']
+                # )
+                
+                # For now, just log that we would create the client
+                self._neo4j_client = f"Neo4jClient({neo4j_config['url']})"
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Client Initialization",
+                        "Neo4j client initialized successfully",
+                        severity='LOW',
+                        context="Backend client setup"
+                    )
+                
+            except Exception as e:
+                error_msg = f"Failed to initialize Neo4j client: {e}"
+                logger.error(error_msg)
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Client Initialization Error",
+                        error_msg,
+                        severity='HIGH',
+                        context="Neo4j backend unavailable"
+                    )
+                raise
+        
+        return self._neo4j_client
     
     def analyze_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskType:
         """Analyze task to determine its type"""
