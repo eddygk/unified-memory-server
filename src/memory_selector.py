@@ -3,9 +3,11 @@ Memory System Selector
 Implements intelligent routing to appropriate memory systems based on task type
 """
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+import re
+from typing import Dict, List, Optional, Any, Tuple, Set
 from enum import Enum
 import time
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,273 @@ class TaskType(Enum):
     UNKNOWN = "unknown"
 
 
+class OperationType(Enum):
+    """Types of operations"""
+    CREATE = "create"
+    READ = "read" 
+    UPDATE = "update"
+    DELETE = "delete"
+    SEARCH = "search"
+    ANALYZE = "analyze"
+
+
+@dataclass
+class TaskAnalysis:
+    """Results of task analysis"""
+    task_type: TaskType
+    operation_type: OperationType
+    entities: List[str]
+    confidence: float
+    reasoning: str
+    patterns_matched: List[str]
+
+
+class IntentAnalyzer:
+    """Advanced intent analyzer for sophisticated task determination"""
+    
+    def __init__(self):
+        self._compile_patterns()
+        
+    def _compile_patterns(self):
+        """Compile regex patterns for efficient matching"""
+        # Relationship patterns
+        self.relationship_patterns = [
+            re.compile(r'\b(?:how\s+(?:is|are|does|do)?|what\s+(?:is|are)?)\s+.*?\b(?:related|connected|linked|associated)\b', re.I),
+            re.compile(r'\b(?:find|show|get)\s+.*?\b(?:relationships?|connections?|links?|associations?)\b', re.I),
+            re.compile(r'\b(?:who|what)\s+.*?\b(?:works?\s+(?:with|on|for)|collaborates?\s+with|is\s+connected\s+to)\b', re.I),
+            re.compile(r'\b(?:map|trace|follow)\s+.*?\b(?:path|route|connection)\b', re.I)
+        ]
+        
+        # User identity patterns
+        self.user_identity_patterns = [
+            re.compile(r'\b(?:who\s+(?:is|am)\s+(?:this\s+)?user|user\s+(?:profile|identity|information))\b', re.I),
+            re.compile(r'\b(?:my|user\'s?)\s+(?:profile|identity|details|information)\b', re.I),
+            re.compile(r'\b(?:about\s+(?:me|user)|tell\s+me\s+about)\b', re.I)
+        ]
+        
+        # Documentation patterns  
+        self.documentation_patterns = [
+            re.compile(r'\b(?:create|write|generate|make)\s+.*?\b(?:document|documentation|guide|manual|report)\b', re.I),
+            re.compile(r'\b(?:comprehensive|detailed|structured|formal)\s+.*?\b(?:note|document|guide)\b', re.I),
+            re.compile(r'\b(?:draft|compose|author)\s+.*?\b(?:article|paper|documentation)\b', re.I)
+        ]
+        
+        # Conversation context patterns
+        self.conversation_patterns = [
+            re.compile(r'\b(?:remember|recall|what\s+did\s+(?:we|i)|previous(?:ly)?)\b', re.I),
+            re.compile(r'\b(?:conversation|chat|discussion)\s+(?:context|history|log)\b', re.I),
+            re.compile(r'\b(?:earlier|before|previously)\s+(?:mentioned|said|discussed)\b', re.I)
+        ]
+        
+        # Search patterns
+        self.search_patterns = [
+            re.compile(r'\b(?:search|find|look\s+(?:for|up)|locate)\s+.*?\b(?:similar|like|matching|related)\b', re.I),
+            re.compile(r'\b(?:semantic|contextual|intelligent)\s+search\b', re.I),
+            re.compile(r'\b(?:find\s+me|show\s+me|get\s+me)\s+.*?\b(?:about|regarding)\b', re.I)
+        ]
+        
+        # Operation type patterns
+        self.create_patterns = [
+            re.compile(r'\b(?:create|make|generate|add|new|build|establish|form)\b', re.I),
+        ]
+        
+        self.read_patterns = [
+            re.compile(r'\b(?:get|retrieve|fetch|show|display|find|read|view|see)\b', re.I),
+        ]
+        
+        self.update_patterns = [
+            re.compile(r'\b(?:update|modify|change|edit|revise|alter|adjust)\b', re.I),
+        ]
+        
+        self.delete_patterns = [
+            re.compile(r'\b(?:delete|remove|clear|erase|drop|eliminate)\b', re.I),
+        ]
+        
+        self.search_patterns_op = [
+            re.compile(r'\b(?:search|find|look|locate|seek|query|explore)\b', re.I),
+        ]
+        
+        self.analyze_patterns = [
+            re.compile(r'\b(?:analyze|examine|investigate|study|assess|evaluate)\b', re.I),
+        ]
+        
+        # Entity extraction patterns - made more precise
+        self.entity_patterns = {
+            'user': re.compile(r'\b(?:user|person|individual|me|myself|i)\b', re.I),
+            'project': re.compile(r'\b(?:projects?|tasks?|assignments?|work|jobs?)\b', re.I),
+            'document': re.compile(r'\b(?:documents?|files?|notes?|papers?|reports?|guides?|documentation)\b', re.I),
+            'relationship': re.compile(r'\b(?:relationships?|connections?|links?|associations?|bonds?)\b', re.I),
+            'conversation': re.compile(r'\b(?:conversations?|chats?|discussions?|talks?|dialogues?)\b', re.I),
+            'memory': re.compile(r'\b(?:memory|memories|remember|recall|stored)\b', re.I),
+        }
+        
+        # Temporal patterns
+        self.temporal_patterns = [
+            re.compile(r'\b(?:today|now|current|recent|latest|this\s+(?:week|month|year))\b', re.I),
+            re.compile(r'\b(?:yesterday|last\s+(?:week|month|year)|previous|earlier|before)\b', re.I),
+            re.compile(r'\b(?:always|never|frequently|often|sometimes|rarely)\b', re.I),
+        ]
+        
+    def analyze(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskAnalysis:
+        """Analyze task with sophisticated pattern matching and entity extraction"""
+        task_clean = task.strip()
+        entities = self._extract_entities(task_clean)
+        operation_type = self._determine_operation_type(task_clean)
+        
+        # Pattern-based task type determination
+        task_type, confidence, reasoning, patterns = self._determine_task_type_advanced(task_clean, entities, context)
+        
+        return TaskAnalysis(
+            task_type=task_type,
+            operation_type=operation_type,
+            entities=entities,
+            confidence=confidence,
+            reasoning=reasoning,
+            patterns_matched=patterns
+        )
+    
+    def _extract_entities(self, task: str) -> List[str]:
+        """Extract entities from task text"""
+        entities = []
+        for entity_type, pattern in self.entity_patterns.items():
+            if pattern.search(task):
+                entities.append(entity_type)
+        return entities
+    
+    def _determine_operation_type(self, task: str) -> OperationType:
+        """Determine the type of operation from task text"""
+        # Check patterns in order of specificity
+        if any(pattern.search(task) for pattern in self.create_patterns):
+            return OperationType.CREATE
+        elif any(pattern.search(task) for pattern in self.update_patterns):
+            return OperationType.UPDATE  
+        elif any(pattern.search(task) for pattern in self.delete_patterns):
+            return OperationType.DELETE
+        elif any(pattern.search(task) for pattern in self.search_patterns_op):
+            # Check if it's a search for something specific vs general retrieval
+            if any(word in task.lower() for word in ['similar', 'like', 'matching', 'related']):
+                return OperationType.SEARCH
+            else:
+                return OperationType.READ
+        elif any(pattern.search(task) for pattern in self.analyze_patterns):
+            return OperationType.ANALYZE
+        else:
+            return OperationType.READ
+    
+    def _determine_task_type_advanced(self, task: str, entities: List[str], context: Optional[Dict[str, Any]]) -> Tuple[TaskType, float, str, List[str]]:
+        """Advanced task type determination with confidence scoring"""
+        scores = {}
+        matched_patterns = []
+        reasoning_parts = []
+        
+        # Relationship analysis
+        relationship_score = 0
+        for pattern in self.relationship_patterns:
+            if pattern.search(task):
+                relationship_score += 0.3
+                matched_patterns.append("relationship_pattern")
+        
+        if 'relationship' in entities:
+            relationship_score += 0.3
+        if any(entity in entities for entity in ['user', 'project']):
+            relationship_score += 0.1
+        
+        # Boost for explicit relationship language  
+        if any(word in task.lower() for word in ['between', 'connected', 'linked']):
+            relationship_score += 0.2
+            matched_patterns.append("connection_language")
+            
+        scores[TaskType.RELATIONSHIP_QUERY] = min(relationship_score, 1.0)
+        
+        # User identity analysis
+        user_identity_score = 0
+        for pattern in self.user_identity_patterns:
+            if pattern.search(task):
+                user_identity_score += 0.4
+                matched_patterns.append("user_identity_pattern")
+        
+        if 'user' in entities:
+            user_identity_score += 0.3
+            
+        scores[TaskType.USER_IDENTITY] = min(user_identity_score, 1.0)
+        
+        # Documentation analysis
+        doc_score = 0
+        for pattern in self.documentation_patterns:
+            if pattern.search(task):
+                doc_score += 0.3
+                matched_patterns.append("documentation_pattern")
+        
+        if 'document' in entities:
+            doc_score += 0.2
+        
+        # Look for complexity indicators
+        if any(word in task.lower() for word in ['comprehensive', 'detailed', 'structured', 'formal']):
+            doc_score += 0.2
+            matched_patterns.append("complexity_indicator")
+            
+        scores[TaskType.DOCUMENTATION] = min(doc_score, 1.0)
+        
+        # Conversation context analysis
+        conv_score = 0
+        for pattern in self.conversation_patterns:
+            if pattern.search(task):
+                conv_score += 0.3
+                matched_patterns.append("conversation_pattern")
+        
+        if 'conversation' in entities or 'memory' in entities:
+            conv_score += 0.2
+        
+        # Temporal indicators boost conversation score
+        if any(pattern.search(task) for pattern in self.temporal_patterns):
+            conv_score += 0.2
+            matched_patterns.append("temporal_indicator")
+            
+        scores[TaskType.CONVERSATION_CONTEXT] = min(conv_score, 1.0)
+        
+        # Semantic search analysis
+        search_score = 0
+        for pattern in self.search_patterns:
+            if pattern.search(task):
+                search_score += 0.4
+                matched_patterns.append("search_pattern")
+        
+        # Boost search score if looking for "related documents" or similar content
+        if any(word in task.lower() for word in ['similar', 'related']) and 'document' in entities:
+            search_score += 0.2
+            matched_patterns.append("similarity_search")
+        
+        scores[TaskType.SEMANTIC_SEARCH] = min(search_score, 1.0)
+        
+        # Context-based hints
+        if context:
+            if context.get('needs_persistence'):
+                scores[TaskType.PERSISTENT_KNOWLEDGE] = 0.8
+                matched_patterns.append("context_persistence")
+            if context.get('is_relational'):
+                scores[TaskType.ENTITY_CONNECTION] = 0.8
+                matched_patterns.append("context_relational")
+            if context.get('is_temporary'):
+                scores[TaskType.SESSION_DATA] = 0.8
+                matched_patterns.append("context_temporary")
+        
+        # Find best match
+        if not scores or max(scores.values()) < 0.2:
+            return TaskType.UNKNOWN, 0.0, "No significant patterns matched", []
+        
+        best_task_type = max(scores.items(), key=lambda x: x[1])
+        task_type, confidence = best_task_type
+        
+        # Build reasoning
+        reasoning = f"Best match: {task_type.value} (confidence: {confidence:.2f})"
+        if matched_patterns:
+            reasoning += f" - Patterns: {', '.join(set(matched_patterns))}"
+        if entities:
+            reasoning += f" - Entities: {', '.join(entities)}"
+            
+        return task_type, confidence, reasoning, matched_patterns
+
+
 class MemorySelector:
     """Selects appropriate memory system based on task characteristics"""
     
@@ -48,6 +317,7 @@ class MemorySelector:
         self.cab_tracker = cab_tracker
         self._selection_rules = self._initialize_rules()
         self._fallback_chains = self._initialize_fallback_chains()
+        self._intent_analyzer = IntentAnalyzer()
         
     def _initialize_rules(self) -> Dict[TaskType, MemorySystem]:
         """Initialize task type to memory system mapping"""
@@ -80,7 +350,36 @@ class MemorySelector:
         }
     
     def analyze_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskType:
-        """Analyze task to determine its type"""
+        """Analyze task to determine its type using sophisticated intent recognition"""
+        # Use advanced intent analyzer
+        analysis = self._intent_analyzer.analyze(task, context)
+        
+        # Log analysis for CAB tracking
+        if self.cab_tracker and analysis.confidence < 0.5:
+            self.cab_tracker.log_suggestion(
+                "Low Confidence Task Analysis",
+                f"Task analysis had low confidence ({analysis.confidence:.2f}): {analysis.reasoning}",
+                severity='MEDIUM',
+                context=f"Task: {task[:50]}... | Patterns: {', '.join(analysis.patterns_matched)}"
+            )
+        
+        # Fallback to legacy keyword matching if confidence is very low
+        if analysis.confidence < 0.3:
+            legacy_task_type = self._analyze_task_legacy(task, context)
+            if legacy_task_type != TaskType.UNKNOWN:
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Fallback to Legacy Analysis",
+                        f"Advanced analysis failed (confidence: {analysis.confidence:.2f}), used legacy keyword matching",
+                        severity='LOW',
+                        context=f"Advanced: {analysis.task_type.value} -> Legacy: {legacy_task_type.value}"
+                    )
+                return legacy_task_type
+        
+        return analysis.task_type
+    
+    def _analyze_task_legacy(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskType:
+        """Legacy keyword-based task analysis for fallback"""
         task_lower = task.lower()
         
         # Check for relationship/connection indicators
@@ -115,6 +414,10 @@ class MemorySelector:
                 return TaskType.SESSION_DATA
         
         return TaskType.UNKNOWN
+    
+    def get_task_analysis(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskAnalysis:
+        """Get detailed task analysis including confidence and reasoning"""
+        return self._intent_analyzer.analyze(task, context)
     
     def select_memory_system(
         self, 
