@@ -48,6 +48,7 @@ class MemorySelector:
         self.cab_tracker = cab_tracker
         self._selection_rules = self._initialize_rules()
         self._fallback_chains = self._initialize_fallback_chains()
+        self._clients_cache = {}
         
     def _initialize_rules(self) -> Dict[TaskType, MemorySystem]:
         """Initialize task type to memory system mapping"""
@@ -78,6 +79,67 @@ class MemorySelector:
             MemorySystem.REDIS: [MemorySystem.BASIC_MEMORY, MemorySystem.NEO4J],
             MemorySystem.BASIC_MEMORY: [MemorySystem.REDIS, MemorySystem.NEO4J],
         }
+    
+    def _get_redis_client(self):
+        """Get Redis client instance"""
+        if MemorySystem.REDIS not in self._clients_cache:
+            try:
+                # Placeholder implementation - would use actual Redis client
+                # from redis_memory import MemoryAPIClient, MemoryClientConfig
+                # config = MemoryClientConfig.from_env()
+                # client = MemoryAPIClient(config)
+                client = None  # Placeholder
+                self._clients_cache[MemorySystem.REDIS] = client
+            except Exception as e:
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Client Instantiation Error",
+                        f"Failed to create Redis client: {str(e)}",
+                        severity='HIGH',
+                        context="Check Redis configuration and connectivity"
+                    )
+                raise Exception(f"Redis client instantiation failed: {e}")
+        return self._clients_cache[MemorySystem.REDIS]
+    
+    def _get_basic_memory_client(self):
+        """Get Basic Memory REST client instance"""
+        if MemorySystem.BASIC_MEMORY not in self._clients_cache:
+            try:
+                # Placeholder implementation - would use httpx or requests
+                # import httpx
+                # client = httpx.Client(base_url=os.getenv('BASIC_MEMORY_URL'))
+                client = None  # Placeholder
+                self._clients_cache[MemorySystem.BASIC_MEMORY] = client
+            except Exception as e:
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Client Instantiation Error", 
+                        f"Failed to create Basic Memory client: {str(e)}",
+                        severity='HIGH',
+                        context="Check Basic Memory service configuration and connectivity"
+                    )
+                raise Exception(f"Basic Memory client instantiation failed: {e}")
+        return self._clients_cache[MemorySystem.BASIC_MEMORY]
+    
+    def _get_neo4j_client(self):
+        """Get Neo4j MCP client instance"""
+        if MemorySystem.NEO4J not in self._clients_cache:
+            try:
+                # Placeholder implementation - would use MCP client wrapper
+                # import httpx
+                # client = httpx.Client(base_url=os.getenv('NEO4J_MCP_URL'))
+                client = None  # Placeholder
+                self._clients_cache[MemorySystem.NEO4J] = client
+            except Exception as e:
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Client Instantiation Error",
+                        f"Failed to create Neo4j MCP client: {str(e)}",
+                        severity='HIGH', 
+                        context="Check Neo4j MCP server configuration and connectivity"
+                    )
+                raise Exception(f"Neo4j MCP client instantiation failed: {e}")
+        return self._clients_cache[MemorySystem.NEO4J]
     
     def analyze_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskType:
         """Analyze task to determine its type"""
@@ -160,6 +222,212 @@ class MemorySelector:
     def get_fallback_chain(self, primary_system: MemorySystem) -> List[MemorySystem]:
         """Get fallback chain for a memory system"""
         return self._fallback_chains.get(primary_system, [])
+    
+    def _store_in_redis(self, data: Any, task_type: TaskType, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Store data in Redis memory system"""
+        try:
+            client = self._get_redis_client()
+            if client is None:
+                raise Exception("Redis client not available")
+            
+            # Placeholder implementation - would map TaskType to appropriate Redis operations
+            # if task_type == TaskType.CONVERSATION_CONTEXT:
+            #     return client.store_working_memory(data)
+            # elif task_type == TaskType.SEMANTIC_SEARCH:
+            #     return client.store_long_term_memory(data)
+            # else:
+            #     return client.store_preference(data)
+            
+            # For now, simulate a failure scenario for testing
+            raise Exception("Redis store operation simulated failure")
+            
+        except Exception as e:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    f"Redis store operation failed: {str(e)}",
+                    severity='HIGH',
+                    context=f"Task type: {task_type.value}, Data type: {type(data).__name__}",
+                    metrics={"system": "redis", "operation": "store", "task_type": task_type.value}
+                )
+            raise Exception(f"Redis store failed: {e}")
+    
+    def _retrieve_from_redis(self, query: Any, task_type: TaskType, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Retrieve data from Redis memory system"""
+        try:
+            client = self._get_redis_client()
+            if client is None:
+                raise Exception("Redis client not available")
+            
+            # Placeholder implementation - would map TaskType to appropriate Redis operations
+            # if task_type == TaskType.CONVERSATION_CONTEXT:
+            #     return client.get_working_memory(query)
+            # elif task_type == TaskType.SEMANTIC_SEARCH:
+            #     return client.search_long_term_memory(query)
+            # else:
+            #     return client.get_preference(query)
+            
+            # For now, simulate a failure scenario for testing
+            raise Exception("Redis retrieve operation simulated failure")
+            
+        except Exception as e:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    f"Redis retrieve operation failed: {str(e)}",
+                    severity='HIGH',
+                    context=f"Task type: {task_type.value}, Query type: {type(query).__name__}",
+                    metrics={"system": "redis", "operation": "retrieve", "task_type": task_type.value}
+                )
+            raise Exception(f"Redis retrieve failed: {e}")
+    
+    def _store_in_neo4j(self, data: Any, task_type: TaskType, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Store data in Neo4j memory system"""
+        try:
+            client = self._get_neo4j_client()
+            if client is None:
+                raise Exception("Neo4j client not available")
+            
+            # Placeholder implementation - would construct MCP payloads
+            # if task_type == TaskType.USER_IDENTITY:
+            #     return client.create_entity(data)
+            # elif task_type == TaskType.RELATIONSHIP_QUERY:
+            #     return client.create_relationship(data)
+            # else:
+            #     return client.execute_cypher(data)
+            
+            # For now, simulate a failure scenario for testing
+            raise Exception("Neo4j store operation simulated failure")
+            
+        except Exception as e:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    f"Neo4j store operation failed: {str(e)}",
+                    severity='HIGH',
+                    context=f"Task type: {task_type.value}, Data type: {type(data).__name__}",
+                    metrics={"system": "neo4j", "operation": "store", "task_type": task_type.value}
+                )
+            raise Exception(f"Neo4j store failed: {e}")
+    
+    def _retrieve_from_neo4j(self, query: Any, task_type: TaskType, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Retrieve data from Neo4j memory system"""
+        try:
+            client = self._get_neo4j_client()
+            if client is None:
+                raise Exception("Neo4j client not available")
+            
+            # Placeholder implementation - would construct MCP payloads
+            # if task_type == TaskType.USER_IDENTITY:
+            #     return client.get_entity(query)
+            # elif task_type == TaskType.RELATIONSHIP_QUERY:
+            #     return client.query_relationships(query)
+            # else:
+            #     return client.execute_cypher(query)
+            
+            # For now, simulate a failure scenario for testing
+            raise Exception("Neo4j retrieve operation simulated failure")
+            
+        except Exception as e:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    f"Neo4j retrieve operation failed: {str(e)}",
+                    severity='HIGH',
+                    context=f"Task type: {task_type.value}, Query type: {type(query).__name__}",
+                    metrics={"system": "neo4j", "operation": "retrieve", "task_type": task_type.value}
+                )
+            raise Exception(f"Neo4j retrieve failed: {e}")
+    
+    def _store_in_basic_memory(self, data: Any, task_type: TaskType, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Store data in Basic Memory system"""
+        try:
+            client = self._get_basic_memory_client()
+            if client is None:
+                raise Exception("Basic Memory client not available")
+            
+            # Placeholder implementation - would use REST API calls
+            # if task_type == TaskType.DOCUMENTATION:
+            #     return client.post('/notes', json=data)
+            # elif task_type == TaskType.STRUCTURED_NOTE:
+            #     return client.post('/entities', json=data)
+            # else:
+            #     return client.post('/general', json=data)
+            
+            # For now, simulate a failure scenario for testing
+            raise Exception("Basic Memory store operation simulated failure")
+            
+        except Exception as e:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    f"Basic Memory store operation failed: {str(e)}",
+                    severity='HIGH',
+                    context=f"Task type: {task_type.value}, Data type: {type(data).__name__}",
+                    metrics={"system": "basic_memory", "operation": "store", "task_type": task_type.value}
+                )
+            raise Exception(f"Basic Memory store failed: {e}")
+    
+    def _retrieve_from_basic_memory(self, query: Any, task_type: TaskType, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Retrieve data from Basic Memory system"""
+        try:
+            client = self._get_basic_memory_client()
+            if client is None:
+                raise Exception("Basic Memory client not available")
+            
+            # Placeholder implementation - would use REST API calls
+            # if task_type == TaskType.DOCUMENTATION:
+            #     return client.get('/search', params={'q': query})
+            # elif task_type == TaskType.STRUCTURED_NOTE:
+            #     return client.get('/entities', params={'q': query})
+            # else:
+            #     return client.get('/general', params={'q': query})
+            
+            # For now, simulate a failure scenario for testing
+            raise Exception("Basic Memory retrieve operation simulated failure")
+            
+        except Exception as e:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    f"Basic Memory retrieve operation failed: {str(e)}",
+                    severity='HIGH',
+                    context=f"Task type: {task_type.value}, Query type: {type(query).__name__}",
+                    metrics={"system": "basic_memory", "operation": "retrieve", "task_type": task_type.value}
+                )
+            raise Exception(f"Basic Memory retrieve failed: {e}")
+    
+    def store_data(self, data: Any, task: str, context: Optional[Dict[str, Any]] = None) -> Tuple[Any, MemorySystem, bool]:
+        """Store data using execute_with_fallback mechanism"""
+        def store_operation(system: MemorySystem, task: str, context: Optional[Dict[str, Any]]) -> Any:
+            task_type = self.analyze_task(task, context)
+            
+            if system == MemorySystem.REDIS:
+                return self._store_in_redis(data, task_type, context)
+            elif system == MemorySystem.NEO4J:
+                return self._store_in_neo4j(data, task_type, context)
+            elif system == MemorySystem.BASIC_MEMORY:
+                return self._store_in_basic_memory(data, task_type, context)
+            else:
+                raise Exception(f"Unsupported memory system: {system}")
+        
+        return self.execute_with_fallback(task, store_operation, context)
+    
+    def retrieve_data(self, query: Any, task: str, context: Optional[Dict[str, Any]] = None) -> Tuple[Any, MemorySystem, bool]:
+        """Retrieve data using execute_with_fallback mechanism"""
+        def retrieve_operation(system: MemorySystem, task: str, context: Optional[Dict[str, Any]]) -> Any:
+            task_type = self.analyze_task(task, context)
+            
+            if system == MemorySystem.REDIS:
+                return self._retrieve_from_redis(query, task_type, context)
+            elif system == MemorySystem.NEO4J:
+                return self._retrieve_from_neo4j(query, task_type, context)
+            elif system == MemorySystem.BASIC_MEMORY:
+                return self._retrieve_from_basic_memory(query, task_type, context)
+            else:
+                raise Exception(f"Unsupported memory system: {system}")
+        
+        return self.execute_with_fallback(task, retrieve_operation, context)
     
     def execute_with_fallback(
         self,
