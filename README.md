@@ -75,6 +75,7 @@ curl http://localhost:8000/health
 - [Client Configuration](docs/client-config.md) - Setting up Claude and other AI agents
 - [API Reference](docs/api.md) - REST API and MCP endpoints
 - [Memory Selection Guide](docs/memory-selection.md) - When to use each memory system
+- [Automated Memory Router](docs/automated-memory-router.md) - Intelligent routing system (Phase 1)
 - [Security Guide](docs/security.md) - Authentication and security best practices
 - [MCP Proxy Client](docs/mcp-proxy.md) - OAuth2 proxy for Claude Desktop
 
@@ -175,7 +176,7 @@ BASIC_MEMORY_PATH=/path/to/obsidian/vault
 - **Neo4j** - Graph relationships and entity modeling
 - **Basic Memory** - Structured markdown knowledge base
 - **Redis** - Fast conversational context and semantic search
-- *Note: System selector will be upgraded to intelligent load balancing ([#12](https://github.com/eddygk/unified-memory-server/issues/12))*
+- **Automated Router** - Intelligent system selection based on request analysis ([Phase 1 Complete](docs/automated-memory-router.md))
 
 ## 🌐 Network Deployment
 
