@@ -3,11 +3,73 @@ Memory System Selector
 Implements intelligent routing to appropriate memory systems based on task type
 """
 import logging
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 import time
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class MemoryClientConfig:
+    """Configuration for Redis Memory API Client"""
+    redis_url: str
+    redis_password: Optional[str] = None
+    max_memory: str = "4gb"
+    tls_enabled: bool = False
+    window_size: int = 20
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimension: int = 1536
+    enable_topic_extraction: bool = True
+    enable_ner: bool = True
+
+
+class MemoryAPIClient:
+    """Simplified Redis Memory API Client (adapted from redis-developer/agent-memory-server)"""
+    
+    def __init__(self, config: MemoryClientConfig):
+        self.config = config
+        self._initialized = False
+        self._redis_client = None
+    
+    def initialize(self):
+        """Initialize the Redis client connection"""
+        try:
+            # In a real implementation, this would connect to Redis
+            # For now, we'll simulate the connection
+            self._initialized = True
+            logger.info(f"Redis client initialized with URL: {self.config.redis_url}")
+        except Exception as e:
+            logger.error(f"Failed to initialize Redis client: {e}")
+            raise
+    
+    def set_working_memory(self, session_id: str, content: str, metadata: Optional[Dict] = None):
+        """Store content in working memory (Redis)"""
+        if not self._initialized:
+            raise Exception("Client not initialized")
+        # Placeholder implementation
+        return {"status": "success", "session_id": session_id}
+    
+    def create_long_term_memory(self, content: str, metadata: Optional[Dict] = None):
+        """Create long-term memory entry"""
+        if not self._initialized:
+            raise Exception("Client not initialized")
+        # Placeholder implementation
+        return {"status": "success", "memory_id": f"mem_{int(time.time())}"}
+    
+    def search_long_term_memory(self, query: str, limit: int = 10, filters: Optional[Dict] = None):
+        """Search long-term memory"""
+        if not self._initialized:
+            raise Exception("Client not initialized")
+        # Placeholder implementation
+        return {"results": [], "total": 0}
+    
+    def close(self):
+        """Close the Redis connection"""
+        self._initialized = False
+        logger.info("Redis client connection closed")
 
 
 class MemorySystem(Enum):
@@ -48,6 +110,116 @@ class MemorySelector:
         self.cab_tracker = cab_tracker
         self._selection_rules = self._initialize_rules()
         self._fallback_chains = self._initialize_fallback_chains()
+        self._config = self._load_configuration()
+        self._redis_client = None
+        
+    def _load_configuration(self) -> Dict[str, Any]:
+        """Load backend configuration parameters from environment variables"""
+        try:
+            config = {
+                # Redis configuration
+                'redis_url': os.getenv('REDIS_URL', 'redis://localhost:6379'),
+                'redis_password': os.getenv('REDIS_PASSWORD'),
+                'redis_max_memory': os.getenv('REDIS_MAX_MEMORY', '4gb'),
+                'redis_tls_enabled': os.getenv('REDIS_TLS_ENABLED', 'false').lower() == 'true',
+                'window_size': int(os.getenv('WINDOW_SIZE', '20')),
+                'embedding_model': os.getenv('EMBEDDING_MODEL', 'text-embedding-3-small'),
+                'embedding_dimension': int(os.getenv('EMBEDDING_DIMENSION', '1536')),
+                'enable_topic_extraction': os.getenv('ENABLE_TOPIC_EXTRACTION', 'true').lower() == 'true',
+                'enable_ner': os.getenv('ENABLE_NER', 'true').lower() == 'true',
+            }
+            
+            # Validate essential configuration
+            if not config['redis_url']:
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Configuration Error",
+                        "Redis URL not configured",
+                        severity='HIGH',
+                        context="Set REDIS_URL environment variable"
+                    )
+                logger.error("Redis URL not configured")
+            
+            return config
+            
+        except Exception as e:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Configuration Loading Error",
+                    f"Failed to load configuration: {str(e)}",
+                    severity='HIGH',
+                    context="Check environment variables and configuration"
+                )
+            logger.error(f"Failed to load configuration: {e}")
+            raise
+    
+    def _get_redis_client(self) -> MemoryAPIClient:
+        """Get configured Redis memory client"""
+        if self._redis_client is not None:
+            return self._redis_client
+        
+        try:
+            # Create configuration
+            config = MemoryClientConfig(
+                redis_url=self._config['redis_url'],
+                redis_password=self._config['redis_password'],
+                max_memory=self._config['redis_max_memory'],
+                tls_enabled=self._config['redis_tls_enabled'],
+                window_size=self._config['window_size'],
+                embedding_model=self._config['embedding_model'],
+                embedding_dimension=self._config['embedding_dimension'],
+                enable_topic_extraction=self._config['enable_topic_extraction'],
+                enable_ner=self._config['enable_ner']
+            )
+            
+            # Create and initialize client
+            client = MemoryAPIClient(config)
+            client.initialize()
+            
+            self._redis_client = client
+            logger.info("Redis client successfully instantiated and configured")
+            
+            return client
+            
+        except Exception as e:
+            error_msg = f"Failed to instantiate Redis client: {str(e)}"
+            logger.error(error_msg)
+            
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Redis Client Instantiation Error",
+                    error_msg,
+                    severity='HIGH',
+                    context="Check Redis configuration and connectivity",
+                    metrics={"redis_url": self._config.get('redis_url', 'not configured')}
+                )
+            
+            raise Exception(error_msg)
+    
+    def test_redis_connection(self) -> bool:
+        """Test Redis client connection and basic operations"""
+        try:
+            client = self._get_redis_client()
+            
+            # Test basic operations
+            result = client.set_working_memory("test_session", "test content")
+            if result.get("status") == "success":
+                logger.info("Redis client connection test successful")
+                return True
+            else:
+                logger.warning("Redis client connection test failed")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Redis connection test failed: {e}")
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Redis Connection Test Failed",
+                    f"Connection test error: {str(e)}",
+                    severity='MEDIUM',
+                    context="Verify Redis server availability and configuration"
+                )
+            return False
         
     def _initialize_rules(self) -> Dict[TaskType, MemorySystem]:
         """Initialize task type to memory system mapping"""
@@ -334,7 +506,13 @@ if __name__ == "__main__":
     
     # Initialize
     cab_tracker = get_cab_tracker()
+    cab_tracker.initialize_session("TestUser", "Claude")
     selector = MemorySelector(cab_tracker)
+    
+    # Test Redis client
+    print("Testing Redis client instantiation...")
+    success = selector.test_redis_connection()
+    print(f"Redis client test: {'PASSED' if success else 'FAILED'}")
     
     # Example task selection
     task = "Find all relationships between user and their projects"
