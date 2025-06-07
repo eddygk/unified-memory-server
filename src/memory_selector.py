@@ -50,14 +50,15 @@ class TaskType(Enum):
 class MemorySelector:
     """Selects appropriate memory system based on task characteristics"""
     
-    def __init__(self, cab_tracker=None, config_path=None):
+    def __init__(self, cab_tracker=None, config_path=None, validate_config=True):
         self.cab_tracker = cab_tracker
         self._selection_rules = self._initialize_rules()
         self._fallback_chains = self._initialize_fallback_chains()
         
         # Load configuration
         self.config = self._load_config(config_path)
-        self._validate_config()
+        if validate_config:
+            self._validate_config()
         
         # Initialize clients (placeholders for now)
         self._redis_client = None
