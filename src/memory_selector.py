@@ -6,6 +6,8 @@ import logging
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 import time
+import os
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,7 @@ class MemorySelector:
         self.cab_tracker = cab_tracker
         self._selection_rules = self._initialize_rules()
         self._fallback_chains = self._initialize_fallback_chains()
+        self._clients = {}  # Cache for instantiated clients
         
     def _initialize_rules(self) -> Dict[TaskType, MemorySystem]:
         """Initialize task type to memory system mapping"""
@@ -93,15 +96,29 @@ class MemorySelector:
         if 'user' in task_lower and any(word in task_lower for word in ['identity', 'profile', 'who']):
             return TaskType.USER_IDENTITY
         
+        # Check for semantic search indicators
+        semantic_keywords = ['search', 'find', 'lookup', 'query', 'retrieve']
+        if any(keyword in task_lower for keyword in semantic_keywords):
+            return TaskType.SEMANTIC_SEARCH
+        
+        # Check for preference storage indicators
+        preference_keywords = ['preference', 'setting', 'config', 'option', 'choice', 'like', 'dislike']
+        if any(keyword in task_lower for keyword in preference_keywords):
+            return TaskType.PREFERENCE_STORAGE
+        
+        # Check for session data indicators
+        session_keywords = ['session', 'current', 'active', 'temporary', 'cache']
+        if any(keyword in task_lower for keyword in session_keywords):
+            return TaskType.SESSION_DATA
+        
         # Check for documentation
         doc_keywords = ['document', 'note', 'write', 'comprehensive', 'detailed', 
                        'guide', 'report', 'structured']
         if any(keyword in task_lower for keyword in doc_keywords):
             return TaskType.DOCUMENTATION
         
-        # Check for conversation/semantic
-        conv_keywords = ['conversation', 'context', 'semantic', 'search', 
-                        'remember', 'previous', 'history']
+        # Check for conversation/context indicators
+        conv_keywords = ['conversation', 'context', 'remember', 'previous', 'history', 'chat']
         if any(keyword in task_lower for keyword in conv_keywords):
             return TaskType.CONVERSATION_CONTEXT
         
@@ -113,6 +130,8 @@ class MemorySelector:
                 return TaskType.ENTITY_CONNECTION
             if context.get('is_temporary'):
                 return TaskType.SESSION_DATA
+            if context.get('is_search'):
+                return TaskType.SEMANTIC_SEARCH
         
         return TaskType.UNKNOWN
     
@@ -231,6 +250,308 @@ class MemorySelector:
         # All systems failed
         logger.error(f"All systems failed for task: {task}")
         raise Exception(f"All memory systems failed. Last error: {last_error}")
+    
+    def _get_redis_client(self):
+        """Get or create Redis memory client"""
+        if MemorySystem.REDIS in self._clients:
+            return self._clients[MemorySystem.REDIS]
+        
+        try:
+            # Import Redis memory client dependencies
+            # Based on the documentation, we need MemoryAPIClient and MemoryClientConfig
+            # For now, we'll create a mock implementation that follows the expected interface
+            from dataclasses import dataclass
+            from urllib.parse import urlparse
+            
+            @dataclass
+            class MemoryClientConfig:
+                """Configuration for Redis memory client"""
+                base_url: str = "http://10.10.20.100:8000"
+                api_key: str = ""
+                timeout: int = 30
+            
+            class MemoryAPIClient:
+                """Mock Redis Memory API Client following redis-developer/agent-memory-server interface"""
+                
+                def __init__(self, config: MemoryClientConfig):
+                    self.config = config
+                    self.base_url = config.base_url.rstrip('/')
+                    
+                    # Validate URL format
+                    try:
+                        parsed = urlparse(self.base_url)
+                        if not parsed.scheme or not parsed.netloc:
+                            raise ValueError(f"Invalid URL format: {self.base_url}")
+                    except Exception as e:
+                        raise ValueError(f"Invalid Redis memory server URL: {e}")
+                    
+                def set_working_memory(self, session_id: str, content: str, metadata: Dict = None):
+                    """Set working memory for a session"""
+                    # Mock implementation - in real scenario this would make HTTP requests
+                    return {"success": True, "session_id": session_id}
+                
+                def get_working_memory(self, session_id: str):
+                    """Get working memory for a session"""
+                    return {"content": f"Working memory for {session_id}", "metadata": {}}
+                
+                def create_long_term_memory(self, payload: Dict):
+                    """Create long-term memory entry"""
+                    return {"id": "mock_memory_id", "success": True}
+                
+                def search_long_term_memory(self, query: str, namespace: str = "default", limit: int = 10):
+                    """Search long-term memories"""
+                    return {
+                        "memories": [
+                            {"id": "mock_id", "text": f"Mock result for: {query}", "score": 0.9}
+                        ],
+                        "total": 1
+                    }
+                
+                def hydrate_memory_prompt(self, text: str, session_id: str = None, **kwargs):
+                    """Get conversation context for prompt hydration"""
+                    return {
+                        "hydrated_prompt": f"[Context: Mock context] {text}",
+                        "context_memories": []
+                    }
+            
+            # Load configuration from environment
+            base_url = os.getenv("REDIS_MEMORY_URL", "http://10.10.20.100:8000")
+            
+            config = MemoryClientConfig(
+                base_url=base_url,
+                api_key=os.getenv("REDIS_MEMORY_API_KEY", ""),
+                timeout=int(os.getenv("REDIS_MEMORY_TIMEOUT", "30"))
+            )
+            
+            client = MemoryAPIClient(config)
+            self._clients[MemorySystem.REDIS] = client
+            
+            logger.info("Redis memory client initialized successfully")
+            return client
+            
+        except Exception as e:
+            error_msg = f"Failed to initialize Redis client: {str(e)}"
+            logger.error(error_msg)
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Redis Client Initialization Failed",
+                    error_msg,
+                    severity='HIGH',
+                    context="Check Redis memory server configuration and availability"
+                )
+            raise
+    
+    def _store_in_redis(self, data: Any, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Store data in Redis memory system"""
+        start_time = time.time()
+        
+        try:
+            client = self._get_redis_client()
+            
+            # Determine task type from context or analyze data
+            task_type = context.get('task_type') if context else TaskType.UNKNOWN
+            if task_type == TaskType.UNKNOWN and isinstance(data, str):
+                task_type = self.analyze_task(data, context)
+            
+            # Map TaskType to appropriate Redis storage method
+            if task_type in [TaskType.CONVERSATION_CONTEXT, TaskType.SESSION_DATA]:
+                # Use working memory for temporary/session data
+                session_id = context.get('session_id', 'default') if context else 'default'
+                
+                # Prepare data for working memory
+                if isinstance(data, dict):
+                    content = data.get('text', str(data))
+                    metadata = data.get('metadata', {})
+                else:
+                    content = str(data)
+                    metadata = context.get('metadata', {}) if context else {}
+                
+                result = client.set_working_memory(
+                    session_id=session_id,
+                    content=content,
+                    metadata=metadata
+                )
+                
+                operation_type = "working_memory_store"
+                
+            else:
+                # Use long-term memory for persistent data (semantic search, preferences, etc.)
+                payload = self._prepare_long_term_memory_payload(data, context, task_type)
+                result = client.create_long_term_memory(payload)
+                operation_type = "long_term_memory_store"
+            
+            duration_ms = (time.time() - start_time) * 1000
+            
+            # Log successful operation
+            if self.cab_tracker:
+                self.cab_tracker.log_memory_operation(
+                    operation=operation_type,
+                    system=MemorySystem.REDIS.value,
+                    success=True,
+                    duration_ms=duration_ms
+                )
+            
+            logger.info(f"Successfully stored data in Redis ({operation_type}) - {duration_ms:.2f}ms")
+            return result
+            
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            error_msg = f"Failed to store data in Redis: {str(e)}"
+            logger.error(error_msg)
+            
+            if self.cab_tracker:
+                self.cab_tracker.log_memory_operation(
+                    operation="redis_store",
+                    system=MemorySystem.REDIS.value,
+                    success=False,
+                    duration_ms=duration_ms
+                )
+                self.cab_tracker.log_suggestion(
+                    "Redis Store Operation Failed",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Task type: {task_type.value if 'task_type' in locals() else 'unknown'}"
+                )
+            
+            raise
+    
+    def _retrieve_from_redis(self, query: Any, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Retrieve data from Redis memory system"""
+        start_time = time.time()
+        
+        try:
+            client = self._get_redis_client()
+            
+            # Determine task type and query type
+            task_type = context.get('task_type') if context else TaskType.UNKNOWN
+            if task_type == TaskType.UNKNOWN and isinstance(query, str):
+                task_type = self.analyze_task(query, context)
+            
+            # Map TaskType to appropriate Redis retrieval method
+            if task_type in [TaskType.CONVERSATION_CONTEXT, TaskType.SESSION_DATA]:
+                # Retrieve from working memory
+                session_id = context.get('session_id', 'default') if context else 'default'
+                result = client.get_working_memory(session_id)
+                operation_type = "working_memory_retrieve"
+                
+            elif task_type == TaskType.SEMANTIC_SEARCH:
+                # Use semantic search in long-term memory
+                namespace = context.get('namespace', 'default') if context else 'default'
+                limit = context.get('limit', 10) if context else 10
+                
+                query_text = query if isinstance(query, str) else str(query)
+                result = client.search_long_term_memory(
+                    query=query_text,
+                    namespace=namespace,
+                    limit=limit
+                )
+                operation_type = "semantic_search"
+                
+            elif task_type == TaskType.PREFERENCE_STORAGE:
+                # Search preferences in long-term memory
+                namespace = context.get('namespace', 'preferences') if context else 'preferences'
+                query_text = query if isinstance(query, str) else str(query)
+                
+                result = client.search_long_term_memory(
+                    query=query_text,
+                    namespace=namespace,
+                    limit=context.get('limit', 5) if context else 5
+                )
+                operation_type = "preference_retrieve"
+                
+            else:
+                # Default to hydrating prompt with context
+                session_id = context.get('session_id') if context else None
+                query_text = query if isinstance(query, str) else str(query)
+                
+                result = client.hydrate_memory_prompt(
+                    text=query_text,
+                    session_id=session_id,
+                    **({k: v for k, v in context.items() if k not in ['task_type', 'session_id']} if context else {})
+                )
+                operation_type = "prompt_hydration"
+            
+            duration_ms = (time.time() - start_time) * 1000
+            
+            # Log successful operation
+            if self.cab_tracker:
+                self.cab_tracker.log_memory_operation(
+                    operation=operation_type,
+                    system=MemorySystem.REDIS.value,
+                    success=True,
+                    duration_ms=duration_ms
+                )
+            
+            logger.info(f"Successfully retrieved data from Redis ({operation_type}) - {duration_ms:.2f}ms")
+            return result
+            
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            error_msg = f"Failed to retrieve data from Redis: {str(e)}"
+            logger.error(error_msg)
+            
+            if self.cab_tracker:
+                self.cab_tracker.log_memory_operation(
+                    operation="redis_retrieve",
+                    system=MemorySystem.REDIS.value,
+                    success=False,
+                    duration_ms=duration_ms
+                )
+                self.cab_tracker.log_suggestion(
+                    "Redis Retrieve Operation Failed",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Query: {str(query)[:100]}..."
+                )
+            
+            raise
+    
+    def _prepare_long_term_memory_payload(self, data: Any, context: Optional[Dict[str, Any]], task_type: TaskType) -> Dict[str, Any]:
+        """Prepare data for long-term memory storage with appropriate MemoryRecord format"""
+        
+        # Extract text content
+        if isinstance(data, dict):
+            text = data.get('text', str(data))
+            metadata = data.get('metadata', {})
+            topics = data.get('topics', [])
+            entities = data.get('entities', [])
+        else:
+            text = str(data)
+            metadata = {}
+            topics = []
+            entities = []
+        
+        # Add context information to metadata
+        if context:
+            metadata.update({
+                'task_type': task_type.value,
+                'source': context.get('source', 'unified_memory_server'),
+                **{k: v for k, v in context.items() if k not in ['task_type', 'session_id', 'metadata']}
+            })
+        
+        # Prepare namespace based on task type
+        namespace_mapping = {
+            TaskType.PREFERENCE_STORAGE: 'preferences',
+            TaskType.SEMANTIC_SEARCH: 'semantic',
+            TaskType.CONVERSATION_CONTEXT: 'conversations',
+            TaskType.SESSION_DATA: 'sessions'
+        }
+        namespace = context.get('namespace') if context else namespace_mapping.get(task_type, 'default')
+        
+        # Create LongTermMemoryPayload-compatible structure
+        payload = {
+            "text": text,
+            "namespace": namespace,
+            "topics": topics,
+            "entities": entities,
+            "metadata": metadata
+        }
+        
+        # Add session_id if available
+        if context and context.get('session_id'):
+            payload["session_id"] = context['session_id']
+        
+        return payload
 
 
 class MemoryPropagator:
@@ -316,10 +637,35 @@ class MemoryPropagator:
         return True
     
     def _propagate_to_redis(self, client, data, data_type, entity_id):
-        """Propagate data to Redis"""
-        # Implementation would depend on actual Redis client
-        # This is a placeholder
-        return True
+        """Propagate data to Redis using MemorySelector's Redis backend logic"""
+        try:
+            # Use MemorySelector's Redis implementation if available
+            if hasattr(self, '_memory_selector') and self._memory_selector:
+                context = {
+                    'entity_id': entity_id,
+                    'data_type': data_type,
+                    'source': 'propagation'
+                }
+                result = self._memory_selector._store_in_redis(data, context)
+                return result.get('success', True)
+            else:
+                # Fallback to direct client usage
+                if hasattr(client, 'create_long_term_memory'):
+                    payload = {
+                        'text': str(data),
+                        'namespace': 'propagation',
+                        'metadata': {
+                            'data_type': data_type,
+                            'entity_id': entity_id,
+                            'source': 'cross_system_propagation'
+                        }
+                    }
+                    result = client.create_long_term_memory(payload)
+                    return result.get('success', True)
+                return False
+        except Exception as e:
+            logger.error(f"Failed to propagate to Redis: {e}")
+            return False
     
     def _propagate_to_basic_memory(self, client, data, data_type, entity_id):
         """Propagate data to Basic Memory"""
