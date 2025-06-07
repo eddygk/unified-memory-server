@@ -158,4 +158,7 @@ def get_cab_tracker() -> CABTracker:
     global _cab_tracker
     if _cab_tracker is None:
         _cab_tracker = CABTracker()
+        # Ensure the tracker is initialized
+        if not _cab_tracker.initialized:
+            _cab_tracker.initialize_session()
     return _cab_tracker
