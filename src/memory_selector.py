@@ -138,6 +138,14 @@ class MemorySelector:
             # Default fallback logic
             primary_system = MemorySystem.REDIS  # Default to Redis for unknown tasks
             logger.warning(f"Unknown task type for: {task[:50]}...")
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Task Analysis",
+                    "Unable to determine task type - using default system",
+                    severity='MEDIUM',
+                    context=f"Task: {task[:100]}. Consider enhancing task analysis rules.",
+                    metrics={"task_preview": task[:50], "default_system": primary_system.value}
+                )
         else:
             primary_system = self._selection_rules.get(task_type, MemorySystem.REDIS)
         
@@ -214,14 +222,24 @@ class MemorySelector:
                 
             except Exception as e:
                 last_error = e
+                duration_ms = (time.time() - start_time) * 1000
                 logger.warning(f"System {system.value} failed: {str(e)}")
                 
                 if self.cab_tracker:
+                    # Log as API error with more context
+                    self.cab_tracker.log_suggestion(
+                        "API Error",
+                        f"{system.value} operation failed during {task_type.value}",
+                        severity='HIGH',
+                        context=f"Error: {str(e)[:200]}. Duration: {duration_ms:.2f}ms. Task: {task[:100]}",
+                        metrics={"error": str(e), "duration_ms": duration_ms, "system": system.value}
+                    )
+                    
                     self.cab_tracker.log_memory_operation(
                         operation=task_type.value,
                         system=system.value,
                         success=False,
-                        duration_ms=0,
+                        duration_ms=duration_ms,
                         fallback_used=False
                     )
                 
@@ -230,6 +248,16 @@ class MemorySelector:
         
         # All systems failed
         logger.error(f"All systems failed for task: {task}")
+        
+        if self.cab_tracker:
+            self.cab_tracker.log_suggestion(
+                "System Failure",
+                f"All memory systems failed for {task_type.value} operation",
+                severity='CRITICAL',
+                context=f"Task: {task[:100]}. Last error: {str(last_error)[:200]}",
+                metrics={"task_type": task_type.value, "systems_tried": len(fallback_chain)}
+            )
+        
         raise Exception(f"All memory systems failed. Last error: {last_error}")
 
 
@@ -272,6 +300,13 @@ class MemoryPropagator:
                 client = self.clients.get(system)
                 if not client:
                     results[system] = False
+                    if self.cab_tracker:
+                        self.cab_tracker.log_suggestion(
+                            "Configuration Error",
+                            f"No client configured for {system.value}",
+                            severity='HIGH',
+                            context=f"Cannot propagate {data_type} to {system.value} - client not configured"
+                        )
                     continue
                 
                 # System-specific propagation logic
@@ -297,6 +332,14 @@ class MemoryPropagator:
             except Exception as e:
                 logger.error(f"Error propagating to {system.value}: {e}")
                 results[system] = False
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Propagation Error",
+                        f"Failed to propagate {data_type} to {system.value}",
+                        severity='HIGH',
+                        context=f"Error: {str(e)[:200]}. Entity: {entity_id or 'unknown'}",
+                        metrics={"error": str(e), "system": system.value, "data_type": data_type}
+                    )
         
         # Log inconsistencies
         failed_systems = [s.value for s, success in results.items() if not success]
@@ -313,18 +356,33 @@ class MemoryPropagator:
         """Propagate data to Neo4j"""
         # Implementation would depend on actual Neo4j client
         # This is a placeholder
+        if self.cab_tracker:
+            self.cab_tracker.log_missing_implementation(
+                "Neo4j Data Propagation",
+                "Neo4j propagation logic not implemented - using placeholder"
+            )
         return True
     
     def _propagate_to_redis(self, client, data, data_type, entity_id):
         """Propagate data to Redis"""
         # Implementation would depend on actual Redis client
         # This is a placeholder
+        if self.cab_tracker:
+            self.cab_tracker.log_missing_implementation(
+                "Redis Data Propagation",
+                "Redis propagation logic not implemented - using placeholder"
+            )
         return True
     
     def _propagate_to_basic_memory(self, client, data, data_type, entity_id):
         """Propagate data to Basic Memory"""
         # Implementation would depend on actual Basic Memory client
         # This is a placeholder
+        if self.cab_tracker:
+            self.cab_tracker.log_missing_implementation(
+                "Basic Memory Data Propagation",
+                "Basic Memory propagation logic not implemented - using placeholder"
+            )
         return True
 
 
