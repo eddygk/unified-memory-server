@@ -168,8 +168,7 @@ class MemorySelector:
                 missing_config.append("NEO4J_URL")
             if not self.config['neo4j']['password']:
                 missing_config.append("NEO4J_PASSWORD")
-            if not self.config['neo4j']['username']:
-                warnings.append("NEO4J_USERNAME not set - using default 'neo4j'")
+            # No need to warn about NEO4J_USERNAME as it defaults to 'neo4j' in _load_config
         
         # Check Basic Memory configuration
         if self.config['basic_memory']['enabled']:
