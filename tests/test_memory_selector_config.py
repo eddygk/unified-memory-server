@@ -8,8 +8,6 @@ import os
 import tempfile
 import unittest
 from unittest.mock import Mock, patch, call
-import logging
-
 from src.memory_selector import MemorySelector
 
 
