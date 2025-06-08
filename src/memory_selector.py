@@ -80,15 +80,25 @@ class MemorySelector:
         Returns:
             Dictionary containing configuration values
         """
-        config = {}
+        # Discover configuration files
+        config_files = self._discover_config_files(config_path)
         
-        # Define fallback file order
+        # Parse configuration files
+        config = self._parse_config_files(config_files)
+        
+        return config
+    
+    def _discover_config_files(self, config_path: Optional[str]) -> List[str]:
+        """Determine the order of configuration files to load."""
         config_files = []
         if config_path:
             config_files.append(config_path)
         config_files.extend(['.env', '.env.production', '.env.local'])
-        
-        # Try to use python-dotenv if available
+        return config_files
+    
+    def _parse_config_files(self, config_files: List[str]) -> Dict[str, Any]:
+        """Parse configuration files and merge their contents."""
+        config = {}
         dotenv_available = False
         try:
             from dotenv import load_dotenv
