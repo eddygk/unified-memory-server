@@ -485,7 +485,7 @@ class MemorySelector:
         # - Configure with base URL and auth from loaded parameters
         # - Or implement MCP client for /mcp endpoint
         logger.info("Creating Basic Memory client (placeholder)")
-        return None
+        raise NotImplementedError("This method is a placeholder and needs to be implemented.")
     
     def _get_neo4j_client(self):
         """
