@@ -188,8 +188,14 @@ class MemorySelector:
                         # Set environment variable for consistent access
                         os.environ[key] = value
                         
+        except FileNotFoundError as e:
+            logger.warning(f"File not found: {env_file}. Ensure the file exists. Error: {e}")
+        except PermissionError as e:
+            logger.warning(f"Permission denied when accessing {env_file}. Check file permissions. Error: {e}")
+        except ValueError as e:
+            logger.warning(f"Value error while parsing {env_file}. Check the file format. Error: {e}")
         except Exception as e:
-            logger.warning(f"Error parsing {env_file}: {e}")
+            logger.warning(f"Unexpected error while parsing {env_file}: {e}")
     
     def _validate_config(self) -> None:
         """
