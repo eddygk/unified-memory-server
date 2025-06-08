@@ -280,7 +280,11 @@ class TestMemorySelectorConfig(unittest.TestCase):
             
             # CAB tracker should be called for missing Redis URL (which is typical default warning)
             # Check if any log_suggestion calls were made
-            self.assertTrue(mock_tracker.log_suggestion.called or True)  # Allow for configuration-dependent behavior
+            # Verify if log_suggestion was called, accounting for configuration-dependent behavior
+            if selector.config.get('redis_url'):  # Example condition based on configuration
+                self.assertTrue(mock_tracker.log_suggestion.called, "Expected log_suggestion to be called.")
+            else:
+                self.assertFalse(mock_tracker.log_suggestion.called, "log_suggestion should not be called without redis_url.")
     
     def test_validation_warnings_to_cab(self):
         """Test that validation warnings are logged to CAB tracker"""
