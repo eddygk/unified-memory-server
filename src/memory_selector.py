@@ -457,7 +457,7 @@ class MemorySelector:
         # - Initialize with URL, password, and other settings from config
         # - Return configured client instance
         logger.info("Creating Redis client (placeholder)")
-        return None
+        raise NotImplementedError("This method is a placeholder and needs to be implemented.")
     
     def _get_basic_memory_client(self):
         """
