@@ -207,46 +207,42 @@ class MemorySelector:
     def _get_redis_client(self):
         """Get Redis client instance"""
         if not self._redis_client and self.config['redis']['enabled']:
-            try:
-                # This is a placeholder for actual Redis client instantiation
-                # In a full implementation, this would import and configure MemoryAPIClient
-                logger.info("Initializing Redis client")
-                
-                redis_config = self.config['redis']
-                logger.info(f"Redis URL: {redis_config['url']}")
-                
-                # Placeholder for actual client creation
-                # from memory_api_client import MemoryAPIClient, MemoryClientConfig
-                # self._redis_client = MemoryAPIClient(MemoryClientConfig(
-                #     url=redis_config['url'],
-                #     password=redis_config['password']
-                # ))
-                
-                # For now, just log that we would create the client
-                self._redis_client = f"RedisClient({redis_config['url']})"
-                
-                if self.cab_tracker:
-                    self.cab_tracker.log_suggestion(
-                        "Client Initialization",
-                        "Redis client initialized successfully",
-                        severity='LOW',
-                        context="Backend client setup"
-                    )
-                
-            except Exception as e:
-                error_msg = f"Failed to initialize Redis client: {e}"
-                logger.error(error_msg)
-                
-                if self.cab_tracker:
-                    self.cab_tracker.log_suggestion(
-                        "Client Initialization Error",
-                        error_msg,
-                        severity='HIGH',
-                        context="Redis backend unavailable"
-                    )
-                raise
-        
+            redis_config = self.config['redis']
+            self._redis_client = self._initialize_client(
+                client_type="Redis",
+                config=redis_config,
+                create_client=lambda: f"RedisClient({redis_config['url']})"
+            )
         return self._redis_client
+    
+    def _initialize_client(self, client_type: str, config: Dict[str, Any], create_client: callable):
+        """Helper to initialize a client with shared logic"""
+        try:
+            logger.info(f"Initializing {client_type} client")
+            logger.info(f"{client_type} URL: {config['url']}")
+            
+            client = create_client()
+            
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Client Initialization",
+                    f"{client_type} client initialized successfully",
+                    severity='LOW',
+                    context="Backend client setup"
+                )
+            return client
+        except Exception as e:
+            error_msg = f"Failed to initialize {client_type} client: {e}"
+            logger.error(error_msg)
+            
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Client Initialization Error",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"{client_type} backend unavailable"
+                )
+            raise
     
     def _get_basic_memory_client(self):
         """Get Basic Memory client instance"""
