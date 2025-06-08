@@ -106,7 +106,7 @@ class MemorySelector:
                     load_dotenv(config_file, override=True)
                 else:
                     # Manual parsing fallback
-                    self._parse_env_file(config_file, config)
+                    self._parse_env_file(config_file)
                 
                 break
         else:
@@ -157,13 +157,12 @@ class MemorySelector:
         
         return config
     
-    def _parse_env_file(self, env_file: str, config: Dict[str, str]) -> None:
+    def _parse_env_file(self, env_file: str) -> None:
         """
         Manual parsing of .env file when python-dotenv is not available.
         
         Args:
             env_file: Path to .env file
-            config: Configuration dictionary to update
         """
         try:
             with open(env_file, 'r', encoding='utf-8') as f:
@@ -188,8 +187,6 @@ class MemorySelector:
                         
                         # Set environment variable for consistent access
                         os.environ[key] = value
-                        # Also update the config dict for consistency  
-                        config[key] = value
                         
         except Exception as e:
             logger.warning(f"Error parsing {env_file}: {e}")
