@@ -3,6 +3,7 @@ Memory System Selector
 Implements intelligent routing to appropriate memory systems based on task type
 """
 import logging
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 import time
@@ -44,10 +45,147 @@ class TaskType(Enum):
 class MemorySelector:
     """Selects appropriate memory system based on task characteristics"""
     
-    def __init__(self, cab_tracker=None):
+    def __init__(self, cab_tracker=None, *, config_path=None, validate_config=True):
         self.cab_tracker = cab_tracker
+        self.config_path = config_path
+        self.validate_config = validate_config
+        self.config = self._load_config()
+        if self.validate_config:
+            self._validate_config()
         self._selection_rules = self._initialize_rules()
         self._fallback_chains = self._initialize_fallback_chains()
+        
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from file or environment with fallback support"""
+        config = {}
+        
+        # Try loading from specified config file first
+        if self.config_path:
+            try:
+                if os.path.exists(self.config_path):
+                    config.update(self._parse_env_file(self.config_path))
+                    logger.info(f"Loaded configuration from {self.config_path}")
+                else:
+                    logger.warning(f"Config file not found: {self.config_path}")
+            except Exception as e:
+                logger.error(f"Failed to load config from {self.config_path}: {e}")
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Configuration Error",
+                        f"Failed to load config file: {self.config_path}",
+                        severity='HIGH',
+                        context=str(e)
+                    )
+        
+        # Fallback to default config locations
+        fallback_paths = [
+            os.path.expanduser("~/.unified-memory/config.env"),
+            os.path.expanduser("~/.config/unified-memory/config.env"),
+            ".env"
+        ]
+        
+        for fallback_path in fallback_paths:
+            if not config and os.path.exists(fallback_path):
+                try:
+                    config.update(self._parse_env_file(fallback_path))
+                    logger.info(f"Loaded fallback configuration from {fallback_path}")
+                    break
+                except Exception as e:
+                    logger.warning(f"Failed to load fallback config from {fallback_path}: {e}")
+        
+        # Load from environment variables as final fallback
+        env_config = {
+            'redis_url': os.getenv('REDIS_URL'),
+            'neo4j_url': os.getenv('NEO4J_URL'),
+            'neo4j_username': os.getenv('NEO4J_USERNAME'),
+            'neo4j_password': os.getenv('NEO4J_PASSWORD'),
+            'basic_memory_url': os.getenv('BASIC_MEMORY_URL'),
+            'basic_memory_path': os.getenv('BASIC_MEMORY_PATH'),
+        }
+        
+        # Only add non-None environment values
+        for key, value in env_config.items():
+            if value is not None:
+                config[key] = value
+        
+        if not config:
+            logger.warning("No configuration loaded, using defaults")
+        
+        return config
+    
+    def _parse_env_file(self, file_path: str) -> Dict[str, str]:
+        """Parse environment file and return configuration dictionary"""
+        config = {}
+        try:
+            with open(file_path, 'r') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    
+                    if '=' not in line:
+                        logger.warning(f"Invalid line {line_num} in {file_path}: {line}")
+                        continue
+                    
+                    key, value = line.split('=', 1)
+                    key = key.strip().lower()
+                    value = value.strip().strip('"').strip("'")
+                    config[key] = value
+        except Exception as e:
+            logger.error(f"Error parsing env file {file_path}: {e}")
+            raise
+        
+        return config
+    
+    def _validate_config(self) -> None:
+        """Validate configuration and log warnings for missing critical settings"""
+        warnings = []
+        
+        # Check for Redis configuration
+        if not self.config.get('redis_url'):
+            warnings.append("Redis URL not configured - Redis memory system may not work")
+        
+        # Check for Neo4j configuration
+        if not self.config.get('neo4j_url'):
+            warnings.append("Neo4j URL not configured - Graph memory system may not work")
+        elif not self.config.get('neo4j_username') or not self.config.get('neo4j_password'):
+            warnings.append("Neo4j credentials not configured - Authentication may fail")
+        
+        # Check for Basic Memory configuration
+        if not self.config.get('basic_memory_url') and not self.config.get('basic_memory_path'):
+            warnings.append("Basic Memory not configured - Local storage may not work")
+        
+        # Log warnings
+        for warning in warnings:
+            logger.warning(warning)
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Configuration Warning",
+                    warning,
+                    severity='MEDIUM',
+                    context="Consider updating configuration"
+                )
+    
+    def _get_redis_client(self):
+        """Get Redis client instance"""
+        # Placeholder for Redis client instantiation
+        # Would import and configure MemoryAPIClient here
+        logger.info("Creating Redis client")
+        return None
+    
+    def _get_basic_memory_client(self):
+        """Get Basic Memory client instance"""
+        # Placeholder for Basic Memory client instantiation
+        # Would configure HTTP client for REST API here
+        logger.info("Creating Basic Memory client")
+        return None
+    
+    def _get_neo4j_client(self):
+        """Get Neo4j client instance"""
+        # Placeholder for Neo4j client instantiation
+        # Would create MCP client wrapper here
+        logger.info("Creating Neo4j client")
+        return None
         
     def _initialize_rules(self) -> Dict[TaskType, MemorySystem]:
         """Initialize task type to memory system mapping"""
