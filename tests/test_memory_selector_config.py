@@ -6,7 +6,6 @@ import tempfile
 import os
 from unittest.mock import patch, MagicMock, call
 import sys
-import logging
 
 # Add src directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -143,6 +142,41 @@ EMPTY_VALUE=
             # Check for specific warnings we expect
             warning_messages = [str(call) for call in warning_calls]
             self.assertTrue(any('REDIS_URL not configured' in msg for msg in warning_messages))
+    
+    @patch('memory_selector.logger')
+    def test_parse_env_file_specific_malformed_entry_assertion(self, mock_logger):
+        """Test specific assertion that logger.warning was called for malformed entry as requested in issue"""
+        # Create a temporary .env file with a specific malformed entry
+        env_content = """VALID_KEY=valid_value
+this_is_a_malformed_line
+ANOTHER_VALID=another_value"""
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.env', delete=False) as temp_file:
+            temp_file.write(env_content)
+            temp_file.flush()
+            
+            try:
+                # Create MemorySelector instance and parse the env file
+                selector = MemorySelector(validate_config=False)
+                selector._parse_env_file(temp_file.name)
+                
+                # Assert that logger.warning was called for the malformed entry
+                mock_logger.warning.assert_called()
+                
+                # Verify the specific malformed line was logged
+                warning_calls = mock_logger.warning.call_args_list
+                malformed_warning = None
+                for call in warning_calls:
+                    if 'this_is_a_malformed_line' in str(call):
+                        malformed_warning = call
+                        break
+                
+                self.assertIsNotNone(malformed_warning, 
+                                   "Expected logger.warning to be called for malformed entry 'this_is_a_malformed_line'")
+                
+            finally:
+                # Clean up temporary file
+                os.unlink(temp_file.name)
 
 
 if __name__ == '__main__':
