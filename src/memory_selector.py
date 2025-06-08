@@ -197,6 +197,11 @@ class MemorySelector:
                         
                         # Set environment variable for consistent access
                         os.environ[key] = value
+                    else:
+                        # Log warning for malformed lines instead of raising an error
+                        # This allows the application to continue running with partial configuration
+                        # rather than failing completely due to a single malformed line
+                        logger.warning(f"Malformed line in {env_file} at line {line_num}: '{line}'. Expected KEY=VALUE format.")
                         
         except FileNotFoundError as e:
             logger.warning(f"File not found: {env_file}. Ensure the file exists. Error: {e}")
