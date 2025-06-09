@@ -22,7 +22,15 @@ class IntentAnalyzer:
 - **Confidence Scoring**: Provides confidence levels for better decision making
 - **Contextual Analysis**: Considers temporal markers and complexity indicators
 
-### 2. Pattern-Based Recognition
+### 2. Analyze Patterns
+- "analyze the data"
+- "examine the relationships"
+- "investigate the patterns"
+- "study the connections"
+- "assess the information"
+- "evaluate the results"
+
+### 3. Pattern-Based Recognition
 
 #### Relationship Patterns
 - "how are X connected to Y"
@@ -50,15 +58,7 @@ class IntentAnalyzer:
 - "search for related documents"
 - "semantic search"
 
-#### Analyze Patterns
-- "analyze the data"
-- "examine the relationships"
-- "investigate the patterns"
-- "study the connections"
-- "assess the information"
-- "evaluate the results"
-
-### 3. Entity Extraction
+### 4. Entity Extraction
 
 The system identifies key entities from task text:
 - **User**: user, person, individual, me, myself, i
@@ -68,7 +68,7 @@ The system identifies key entities from task text:
 - **Conversation**: conversations, chats, discussions, talks, dialogues
 - **Memory**: memory, memories, remember, recall, stored
 
-### 4. Operation Type Classification
+### 5. Operation Type Classification
 
 Operations are automatically classified:
 - **CREATE**: create, make, generate, add, new, build, establish, form
@@ -78,7 +78,7 @@ Operations are automatically classified:
 - **SEARCH**: search, find, look, locate, seek, query, explore (with similarity keywords)
 - **ANALYZE**: analyze, examine, investigate, study, assess, evaluate
 
-### 5. Confidence Scoring
+### 6. Confidence Scoring
 
 The system provides confidence scores (0.0 to 1.0) based on:
 - Pattern matches (each pattern adds 0.2-0.4 to confidence)
@@ -86,7 +86,7 @@ The system provides confidence scores (0.0 to 1.0) based on:
 - Context indicators (complexity, temporal markers add 0.2)
 - Explicit language ("between", "connected", "linked" add 0.2)
 
-### 6. Fallback Mechanism
+### 7. Fallback Mechanism
 
 - Enhanced analysis is used by default
 - If confidence < 0.3, falls back to legacy keyword matching
