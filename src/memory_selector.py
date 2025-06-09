@@ -122,7 +122,7 @@ class Neo4jMCPClient:
                 except (socket.gaierror, socket.error):
                     # Hostname doesn't resolve, raise a descriptive exception instead of trying the network call
                     logger.warning(f"Test mode: Skipping network call to unreachable hostname '{hostname}'")
-                    raise Exception(f"Test mode: Neo4j MCP server at {hostname} is not reachable (expected in development/CI environment)")
+                    raise ConnectivityError(f"Test mode: Neo4j MCP server at {hostname} is not reachable (expected in development/CI environment)")
         
         payload = {
             "jsonrpc": "2.0",
