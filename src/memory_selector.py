@@ -13,11 +13,17 @@ from enum import Enum
 import requests
 import json
 
+
+class ConnectivityError(Exception):
+    """Custom exception for connectivity issues in test mode"""
+    pass
+
 # Initialize logger for the module
 logger = logging.getLogger(__name__)
 
 # Configuration constants
 FALLBACK_THRESHOLD = 0.3  # Confidence threshold below which fallback to legacy analysis is used
+INTERNAL_HOSTNAMES = ['basic-memory', 'neo4j', 'redis', 'localhost']  # Internal Docker hostnames
 
 
 class MemorySystem(Enum):
@@ -1064,7 +1070,12 @@ class MemorySelector:
         return {"status": "stored", "system": "redis", "data_id": "mock_redis_id"}
 
     def _store_in_neo4j(self, data: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
-        """Store data in Neo4j memory system"""
+        """
+        Store data in Neo4j memory system using MCP.
+        
+        Targets mcp-neo4j-memory for entity/relation operations or mcp-neo4j-cypher for raw queries.
+        Constructs appropriate MCP JSON payloads and handles responses and errors.
+        """
         client = self._get_neo4j_client()
         if not client:
             if self.cab_tracker:
@@ -1079,24 +1090,115 @@ class MemorySelector:
         try:
             logger.info(f"Storing data in Neo4j via MCP for task: {task}")
             
-            # Map the data to Neo4j entity format for MCP
+            # Determine storage strategy based on data type and task context
+            task_analysis = self.get_task_analysis(task, context)
+            
+            # Check if this is a raw Cypher operation
+            if "cypher" in data or "query" in data:
+                # Use mcp-neo4j-cypher for raw Cypher queries
+                cypher_query = data.get("cypher") or data.get("query")
+                parameters = data.get("parameters", {})
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Neo4j Cypher Storage",
+                        f"Executing raw Cypher query for task: {task[:50]}...",
+                        severity='LOW',
+                        context=f"Query: {cypher_query[:100]}..."
+                    )
+                
+                result = client.execute_cypher(cypher_query, parameters)
+                return {"status": "stored", "system": "neo4j_mcp_cypher", "result": result}
+            
+            # Otherwise, use mcp-neo4j-memory for entity/relation operations
             entities = []
-            if isinstance(data, dict):
+            relations = []
+            
+            # Handle different data structures
+            if "entities" in data:
+                # Direct entity data
+                entities = data["entities"]
+            elif "relations" in data:
+                # Direct relation data - store relations separately
+                relations = data["relations"]
+            else:
+                # Convert general data to entity format
+                entity_labels = ["Entity"]
+                
+                # Determine entity type based on task analysis
+                if task_analysis.task_type == TaskType.USER_IDENTITY:
+                    entity_labels = ["User", "Entity"]
+                elif task_analysis.task_type == TaskType.RELATIONSHIP_QUERY:
+                    entity_labels = ["Relationship", "Entity"]
+                elif "user" in data or "user_id" in data:
+                    entity_labels = ["User", "Entity"]
+                elif "project" in data or "task" in str(data).lower():
+                    entity_labels = ["Project", "Entity"]
+                
                 entity = {
-                    "labels": ["Entity"],
+                    "labels": entity_labels,
                     "properties": {
                         "content": data.get("content", str(data)),
                         "title": data.get("title", f"Entity for task: {task}"),
                         "task": task,
-                        "stored_at": data.get("timestamp"),
-                        **data.get("metadata", {})
+                        "task_type": task_analysis.task_type.value,
+                        "created_at": data.get("timestamp") or data.get("created_at"),
+                        **data.get("metadata", {}),
+                        **{k: v for k, v in data.items() if k not in ["content", "title", "metadata", "timestamp"]}
                     }
                 }
                 entities.append(entity)
             
-            result = client.create_entities(entities)
+            result = {}
+            
+            # Store entities if any
+            if entities:
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Neo4j Entity Storage",
+                        f"Storing {len(entities)} entities for task: {task[:50]}...",
+                        severity='LOW',
+                        context=f"Entity types: {[e.get('labels', []) for e in entities]}"
+                    )
+                entity_result = client.create_entities(entities)
+                result["entities"] = entity_result
+            
+            # Store relations if any
+            if relations:
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Neo4j Relation Storage",
+                        f"Storing {len(relations)} relations for task: {task[:50]}...",
+                        severity='LOW',
+                        context=f"Relations: {', '.join([str(r.get('source')) + '->' + str(r.get('target')) for r in relations[:3]])}"
+                    )
+                # Use create_relations method if available, otherwise execute as Cypher
+                try:
+                    relation_result = client.send_memory_request("create_relations", {"relations": relations})
+                    result["relations"] = relation_result
+                except Exception:
+                    # Fallback to Cypher for relations
+                    for relation in relations:
+                        cypher = f"""
+                        MATCH (source {{name: $source_name}})
+                        MATCH (target {{name: $target_name}})
+                        CREATE (source)-[r:{relation.get('relationType', 'RELATED_TO')}]->(target)
+                        SET r += $properties
+                        RETURN r
+                        """
+                        params = {
+                            "source_name": relation.get("source"),
+                            "target_name": relation.get("target"),
+                            "properties": relation.get("properties", {})
+                        }
+                        client.execute_cypher(cypher, params)
+                    result["relations"] = {"created": len(relations)}
+            
             return {"status": "stored", "system": "neo4j_mcp", "result": result}
             
+        except ConnectivityError as e:
+            # Re-raise connectivity errors without additional wrapping
+            raise e
         except requests.exceptions.RequestException as e:
             error_msg = f"Neo4j MCP API request failed: {str(e)}"
             if self.cab_tracker:
@@ -1194,7 +1296,12 @@ class MemorySelector:
         return {"status": "retrieved", "system": "redis", "results": ["mock_redis_result"]}
 
     def _retrieve_from_neo4j(self, query: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
-        """Retrieve data from Neo4j memory system"""
+        """
+        Retrieve data from Neo4j memory system using MCP.
+        
+        Targets mcp-neo4j-memory for entity/relation operations or mcp-neo4j-cypher for raw queries.
+        Constructs appropriate MCP JSON payloads and handles responses and errors.
+        """
         client = self._get_neo4j_client()
         if not client:
             if self.cab_tracker:
@@ -1209,27 +1316,145 @@ class MemorySelector:
         try:
             logger.info(f"Retrieving data from Neo4j via MCP for task: {task}")
             
+            # Determine retrieval strategy based on query type and task context
+            task_analysis = self.get_task_analysis(task, context)
+            
             # Handle different types of queries
             if "cypher" in query:
-                # Direct Cypher query
+                # Direct Cypher query - use mcp-neo4j-cypher
                 cypher_query = query["cypher"]
                 parameters = query.get("parameters", {})
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Neo4j Cypher Query",
+                        f"Executing raw Cypher query for task: {task[:50]}...",
+                        severity='LOW',
+                        context=f"Query: {cypher_query[:100]}..."
+                    )
+                
                 result = client.execute_cypher(cypher_query, parameters)
                 results = result.get("records", [])
+                
             elif "search" in query or "query" in query:
-                # Search query using memory server
+                # Search query using mcp-neo4j-memory
                 search_term = query.get("search") or query.get("query", "")
                 filters = query.get("filters", {})
+                
+                # Add task-specific context to filters
+                if task_analysis.task_type == TaskType.USER_IDENTITY:
+                    filters.setdefault("labels", []).append("User")
+                elif task_analysis.task_type == TaskType.RELATIONSHIP_QUERY:
+                    # For relationship queries, we might want to search for both nodes and relationships
+                    pass
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Neo4j Node Search",
+                        f"Searching nodes for: '{search_term[:50]}...' with task: {task[:50]}...",
+                        severity='LOW',
+                        context=f"Filters: {filters}"
+                    )
+                
                 search_result = client.search_nodes(search_term, filters)
                 results = search_result.get("nodes", [])
+                
+            elif "relationship" in query or "relation" in query:
+                # Relationship-specific query using Cypher
+                source = query.get("source")
+                target = query.get("target")
+                relation_type = query.get("relation_type", "")
+                
+                if source and target:
+                    # Query for specific relationships between nodes
+                    cypher_query = f"""
+                    MATCH (source)-[r{f':{relation_type}' if relation_type else ''}]->(target)
+                    WHERE source.name = $source_name AND target.name = $target_name
+                    RETURN source, r, target
+                    """
+                    parameters = {"source_name": source, "target_name": target}
+                elif source:
+                    # Query for all relationships from a source
+                    cypher_query = f"""
+                    MATCH (source)-[r{f':{relation_type}' if relation_type else ''}]->(target)
+                    WHERE source.name = $source_name
+                    RETURN source, r, target
+                    """
+                    parameters = {"source_name": source}
+                else:
+                    # General relationship query
+                    cypher_query = f"""
+                    MATCH (source)-[r{f':{relation_type}' if relation_type else ''}]->(target)
+                    RETURN source, r, target
+                    LIMIT 100
+                    """
+                    parameters = {}
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Neo4j Relationship Query",
+                        f"Querying relationships for task: {task[:50]}...",
+                        severity='LOW',
+                        context=f"Source: {source}, Target: {target}, Type: {relation_type}"
+                    )
+                
+                result = client.execute_cypher(cypher_query, parameters)
+                results = result.get("records", [])
+                
+            elif "entity_id" in query or "node_id" in query:
+                # Direct entity lookup
+                entity_id = query.get("entity_id") or query.get("node_id")
+                cypher_query = "MATCH (n) WHERE id(n) = $node_id RETURN n"
+                parameters = {"node_id": int(entity_id)}
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Neo4j Entity Lookup",
+                        f"Looking up entity by ID: {entity_id}",
+                        severity='LOW',
+                        context=f"Task: {task}"
+                    )
+                
+                result = client.execute_cypher(cypher_query, parameters)
+                results = result.get("records", [])
+                
             else:
-                # General query - convert to search
+                # General query - convert to search using mcp-neo4j-memory
                 search_term = str(query)
+                
+                # Try to extract meaningful search terms
+                if isinstance(query, dict):
+                    search_parts = []
+                    for key, value in query.items():
+                        if isinstance(value, str) and len(value) > 2:
+                            search_parts.append(value)
+                    search_term = " ".join(search_parts) if search_parts else str(query)
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Neo4j General Search",
+                        f"General search for: '{search_term[:50]}...' with task: {task[:50]}...",
+                        severity='LOW',
+                        context=f"Original query: {str(query)[:100]}..."
+                    )
+                
                 search_result = client.search_nodes(search_term)
                 results = search_result.get("nodes", [])
             
-            return {"status": "retrieved", "system": "neo4j_mcp", "results": results}
+            # Log successful retrieval
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Neo4j Retrieval Success",
+                    f"Retrieved {len(results)} results for task: {task[:50]}...",
+                    severity='LOW',
+                    context=f"Query type: {list(query.keys()) if isinstance(query, dict) else 'string'}"
+                )
             
+            return {"status": "retrieved", "system": "neo4j_mcp", "results": results, "count": len(results)}
+            
+        except ConnectivityError as e:
+            # Re-raise connectivity errors without additional wrapping
+            raise e
         except requests.exceptions.RequestException as e:
             error_msg = f"Neo4j MCP API request failed: {str(e)}"
             if self.cab_tracker:
