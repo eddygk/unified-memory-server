@@ -43,6 +43,14 @@ class IntentType(Enum):
     UNKNOWN = "unknown"
 
 
+class Operation(Enum):
+    """Types of memory operations"""
+    STORE = "store"
+    QUERY = "query"
+    RETRIEVE = "retrieve"
+    SEARCH = "search"
+
+
 @dataclass
 class Entity:
     """Represents an extracted entity"""
@@ -54,8 +62,11 @@ class Entity:
 
 @dataclass
 class MemoryRequest:
-    """Represents a memory operation request"""
-    operation: str  # store, query, retrieve, search
+    """Represents a memory operation request
+    
+    Supported operations: store, query, retrieve, search
+    """
+    operation: Operation
     content: str
     context: Optional[Dict[str, Any]] = None
     entities: List[Entity] = field(default_factory=list)
@@ -546,7 +557,7 @@ class AutomatedMemoryRouter:
     def store_data(self, data: Dict[str, Any], content: str, context: Optional[Dict[str, Any]] = None) -> Tuple[Any, MemorySystem, bool]:
         """Store data using automated routing"""
         request = MemoryRequest(
-            operation="store",
+            operation=Operation.STORE,
             content=content,
             context=context,
             metadata=data
@@ -560,7 +571,7 @@ class AutomatedMemoryRouter:
     def retrieve_data(self, query: Dict[str, Any], content: str, context: Optional[Dict[str, Any]] = None) -> Tuple[Any, MemorySystem, bool]:
         """Retrieve data using automated routing"""
         request = MemoryRequest(
-            operation="retrieve", 
+            operation=Operation.RETRIEVE, 
             content=content,
             context=context,
             metadata=query

@@ -9,7 +9,7 @@ memory systems based on request analysis.
 import sys
 import os
 
-from src.automated_memory_router import AutomatedMemoryRouter, MemoryRequest
+from src.automated_memory_router import AutomatedMemoryRouter, MemoryRequest, Operation
 from src.cab_tracker import CABTracker
 
 
@@ -27,32 +27,32 @@ def demo_routing_decisions():
         {
             "description": "Relationship Creation",
             "content": "Connect John Smith to the Marketing project as team lead",
-            "operation": "store"
+            "operation": Operation.STORE
         },
         {
             "description": "Documentation Storage", 
             "content": "Create comprehensive documentation for the API endpoints",
-            "operation": "store"
+            "operation": Operation.STORE
         },
         {
             "description": "Semantic Search",
             "content": "Find documents similar to machine learning algorithms",
-            "operation": "search"
+            "operation": Operation.SEARCH
         },
         {
             "description": "User Profile Query",
             "content": "How is Alice connected to the DevOps team?",
-            "operation": "query"
+            "operation": Operation.QUERY
         },
         {
             "description": "Context Retrieval",
             "content": "Remember what we discussed about the project timeline",
-            "operation": "retrieve"
+            "operation": Operation.RETRIEVE
         },
         {
             "description": "Comprehensive Storage",
             "content": "Store complete profile information for this user including all relationships",
-            "operation": "store"
+            "operation": Operation.STORE
         }
     ]
     
@@ -66,7 +66,7 @@ def demo_routing_decisions():
         request = MemoryRequest(
             operation=test_case['operation'],
             content=test_case['content'],
-            context={'operation': test_case['operation']}
+            context={'operation': test_case['operation'].value}
         )
         
         # Get routing decision
@@ -131,9 +131,9 @@ def demo_performance_tracking():
     # Now test how this affects routing
     print("How performance affects routing:")
     request = MemoryRequest(
-        operation="query",
+        operation=Operation.QUERY,
         content="Find user relationships",  # Normally would go to Neo4j
-        context={'operation': 'query'}
+        context={'operation': Operation.QUERY.value}
     )
     
     decision = router.route(request)
@@ -158,7 +158,7 @@ def demo_entity_extraction():
     for content in test_content:
         print(f"Content: \"{content}\"")
         
-        request = MemoryRequest(operation="store", content=content)
+        request = MemoryRequest(operation=Operation.STORE, content=content)
         entities = router.entity_extractor.extract(request)
         
         if entities:

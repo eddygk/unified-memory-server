@@ -10,7 +10,7 @@ import os
 
 from src.automated_memory_router import (
     AutomatedMemoryRouter, IntentAnalyzer, EntityExtractor, RoutingEngine,
-    PerformanceTracker, MemoryRequest, Entity, IntentType, RoutingDecision
+    PerformanceTracker, MemoryRequest, Entity, IntentType, RoutingDecision, Operation
 )
 from src.memory_selector import MemorySystem
 
@@ -31,7 +31,7 @@ class TestIntentAnalyzer(unittest.TestCase):
         ]
         
         for content, expected_intent in test_cases:
-            request = MemoryRequest(operation="test", content=content)
+            request = MemoryRequest(operation=Operation.QUERY, content=content)
             result = self.analyzer.analyze(request)
             self.assertEqual(result, expected_intent, f"Failed for: {content}")
     
@@ -45,7 +45,7 @@ class TestIntentAnalyzer(unittest.TestCase):
         ]
         
         for content, expected_intent in test_cases:
-            request = MemoryRequest(operation="test", content=content)
+            request = MemoryRequest(operation=Operation.QUERY, content=content)
             result = self.analyzer.analyze(request)
             self.assertEqual(result, expected_intent, f"Failed for: {content}")
     
@@ -59,7 +59,7 @@ class TestIntentAnalyzer(unittest.TestCase):
         ]
         
         for content, expected_intent in test_cases:
-            request = MemoryRequest(operation="test", content=content)
+            request = MemoryRequest(operation=Operation.QUERY, content=content)
             result = self.analyzer.analyze(request)
             self.assertEqual(result, expected_intent, f"Failed for: {content}")
     
@@ -72,7 +72,7 @@ class TestIntentAnalyzer(unittest.TestCase):
         ]
         
         for content, expected_intent in test_cases:
-            request = MemoryRequest(operation="test", content=content)
+            request = MemoryRequest(operation=Operation.QUERY, content=content)
             result = self.analyzer.analyze(request)
             self.assertEqual(result, expected_intent, f"Failed for: {content}")
     
@@ -82,7 +82,7 @@ class TestIntentAnalyzer(unittest.TestCase):
         
         # Test with store context
         request_store = MemoryRequest(
-            operation="test", 
+            operation=Operation.QUERY, 
             content=content,
             context={'operation': 'store'}
         )
@@ -90,7 +90,7 @@ class TestIntentAnalyzer(unittest.TestCase):
         
         # Test with search context  
         request_search = MemoryRequest(
-            operation="test",
+            operation=Operation.QUERY,
             content=content, 
             context={'operation': 'search'}
         )
@@ -104,12 +104,12 @@ class TestIntentAnalyzer(unittest.TestCase):
         # Let's test with clearer differentiation
         content_ambiguous = "handle data"
         request_ambiguous_store = MemoryRequest(
-            operation="test", 
+            operation=Operation.QUERY, 
             content=content_ambiguous,
             context={'operation': 'store'}
         )
         request_ambiguous_search = MemoryRequest(
-            operation="test",
+            operation=Operation.QUERY,
             content=content_ambiguous, 
             context={'operation': 'retrieve'}
         )
@@ -126,7 +126,7 @@ class TestIntentAnalyzer(unittest.TestCase):
     def test_unknown_intent_fallback(self):
         """Test that unclear content returns UNKNOWN intent"""
         unclear_content = "Lorem ipsum dolor sit amet"
-        request = MemoryRequest(operation="test", content=unclear_content)
+        request = MemoryRequest(operation=Operation.QUERY, content=unclear_content)
         result = self.analyzer.analyze(request)
         self.assertEqual(result, IntentType.UNKNOWN)
 
@@ -140,7 +140,7 @@ class TestEntityExtractor(unittest.TestCase):
     def test_person_entity_extraction(self):
         """Test extraction of person entities"""
         content = "John Smith mentioned that Alice Johnson is working on the project"
-        request = MemoryRequest(operation="test", content=content)
+        request = MemoryRequest(operation=Operation.QUERY, content=content)
         entities = self.extractor.extract(request)
         
         person_entities = [e for e in entities if e.entity_type == 'person']
@@ -153,7 +153,7 @@ class TestEntityExtractor(unittest.TestCase):
     def test_project_entity_extraction(self):
         """Test extraction of project entities"""
         content = "Working on Project Alpha and the Database Migration initiative"
-        request = MemoryRequest(operation="test", content=content)
+        request = MemoryRequest(operation=Operation.QUERY, content=content)
         entities = self.extractor.extract(request)
         
         project_entities = [e for e in entities if e.entity_type == 'project']
@@ -162,7 +162,7 @@ class TestEntityExtractor(unittest.TestCase):
     def test_document_entity_extraction(self):
         """Test extraction of document entities"""
         content = "Please read the readme.md file and the API documentation"
-        request = MemoryRequest(operation="test", content=content)
+        request = MemoryRequest(operation=Operation.QUERY, content=content)
         entities = self.extractor.extract(request)
         
         doc_entities = [e for e in entities if e.entity_type == 'document']
@@ -179,7 +179,7 @@ class TestEntityExtractor(unittest.TestCase):
             {'name': 'TestEntity', 'entity_type': 'custom', 'confidence': 0.9}
         ]
         request = MemoryRequest(
-            operation="test", 
+            operation=Operation.QUERY, 
             content=content,
             context={'entities': context_entities}
         )
@@ -192,7 +192,7 @@ class TestEntityExtractor(unittest.TestCase):
     def test_entity_confidence_scoring(self):
         """Test that entities have confidence scores"""
         content = "John Smith is working on Project Alpha"
-        request = MemoryRequest(operation="test", content=content)
+        request = MemoryRequest(operation=Operation.QUERY, content=content)
         entities = self.extractor.extract(request)
         
         for entity in entities:
@@ -331,7 +331,7 @@ class TestRoutingEngine(unittest.TestCase):
     
     def test_routing_decision_generation(self):
         """Test generation of routing decisions"""
-        request = MemoryRequest(operation="test", content="Create relationship between users")
+        request = MemoryRequest(operation=Operation.QUERY, content="Create relationship between users")
         scores = {'neo4j': 0.8, 'redis': 0.3, 'basic_memory': 0.2}
         
         decision = self.routing_engine.route(request, scores)
@@ -345,7 +345,7 @@ class TestRoutingEngine(unittest.TestCase):
         """Test detection of operations requiring multiple systems"""
         # Test with comprehensive content
         request = MemoryRequest(
-            operation="store",
+            operation=Operation.STORE,
             content="Store complete profile information for this user"
         )
         scores = {'neo4j': 0.7, 'redis': 0.6, 'basic_memory': 0.5}
@@ -383,7 +383,7 @@ class TestAutomatedMemoryRouter(unittest.TestCase):
     def test_routing_workflow(self):
         """Test complete routing workflow"""
         request = MemoryRequest(
-            operation="store",
+            operation=Operation.STORE,
             content="Connect John Smith to the marketing project"
         )
         
@@ -434,7 +434,7 @@ class TestAutomatedMemoryRouter(unittest.TestCase):
     
     def test_performance_tracking_integration(self):
         """Test that performance is tracked during operations"""
-        request = MemoryRequest(operation="test", content="Test operation")
+        request = MemoryRequest(operation=Operation.QUERY, content="Test operation")
         
         def mock_operation(system, task, context):
             return {"result": "success"}
@@ -460,7 +460,7 @@ class TestAutomatedMemoryRouter(unittest.TestCase):
     
     def test_fallback_integration(self):
         """Test integration with existing fallback mechanism"""
-        request = MemoryRequest(operation="test", content="Test content")
+        request = MemoryRequest(operation=Operation.QUERY, content="Test content")
         
         def failing_operation(system, task, context):
             raise Exception("Primary system failed")
@@ -503,7 +503,7 @@ class TestIntegrationScenarios(unittest.TestCase):
         }
         
         # This should trigger comprehensive storage (multi-system)
-        request = MemoryRequest(operation="store", content=content, metadata=data)
+        request = MemoryRequest(operation=Operation.STORE, content=content, metadata=data)
         decision = self.router.route(request)
         
         # Should detect comprehensive storage need
@@ -515,7 +515,7 @@ class TestIntegrationScenarios(unittest.TestCase):
         content = "Find documentation similar to API design principles"
         query = {"search_text": content, "type": "semantic"}
         
-        request = MemoryRequest(operation="search", content=content, metadata=query)
+        request = MemoryRequest(operation=Operation.SEARCH, content=content, metadata=query)
         decision = self.router.route(request)
         
         # Should route to Redis for semantic search or Basic Memory for documents
@@ -526,7 +526,7 @@ class TestIntegrationScenarios(unittest.TestCase):
         """Test relationship query scenario"""
         content = "How is Alice connected to the DevOps team and what projects do they share?"
         
-        request = MemoryRequest(operation="query", content=content)
+        request = MemoryRequest(operation=Operation.QUERY, content=content)
         decision = self.router.route(request)
         
         # Should route to Neo4j for relationship queries
@@ -541,7 +541,7 @@ class TestIntegrationScenarios(unittest.TestCase):
         
         # Test relationship query (normally would go to Neo4j)
         content = "Find connections between users"
-        request = MemoryRequest(operation="query", content=content)
+        request = MemoryRequest(operation=Operation.QUERY, content=content)
         decision = self.router.route(request)
         
         # With poor Neo4j performance, might route elsewhere or have lower confidence
