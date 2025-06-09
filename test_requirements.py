@@ -10,6 +10,63 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 from memory_selector import MemorySelector, MemorySystem, TaskType
 from cab_tracker import CABTracker
 import tempfile
+import pytest
+
+@pytest.mark.parametrize("method_name", [
+    '_store_in_redis',
+    '_store_in_neo4j',
+    '_store_in_basic_memory'
+])
+def test_store_methods_raise_exceptions(method_name):
+    """Test that _store_in_X methods raise exceptions on failure"""
+    # Create a temporary CAB file for testing
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        cab_file = f.name
+    
+    try:
+        # Initialize memory selector with CAB tracker
+        cab_tracker = CABTracker(cab_file)
+        selector = MemorySelector(cab_tracker)
+        
+        # Test that the method raises an exception
+        method = getattr(selector, method_name)
+        with pytest.raises(Exception):
+            method({"test": "data"}, TaskType.UNKNOWN)
+        
+        print(f"  ✓ {method_name} properly raises exception")
+        
+    finally:
+        # Clean up
+        if os.path.exists(cab_file):
+            os.unlink(cab_file)
+
+@pytest.mark.parametrize("method_name,system", [
+    ('_retrieve_from_redis', MemorySystem.REDIS),
+    ('_retrieve_from_neo4j', MemorySystem.NEO4J),
+    ('_retrieve_from_basic_memory', MemorySystem.BASIC_MEMORY)
+])
+def test_retrieve_methods_raise_exceptions(method_name, system):
+    """Test that _retrieve_from_X methods raise exceptions on failure"""
+    # Create a temporary CAB file for testing
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        cab_file = f.name
+    
+    try:
+        # Initialize memory selector with CAB tracker
+        cab_tracker = CABTracker(cab_file)
+        selector = MemorySelector(cab_tracker)
+        
+        # Test that the method raises an exception
+        method = getattr(selector, method_name)
+        with pytest.raises(Exception):
+            method({"test": "query"}, TaskType.UNKNOWN)
+        
+        print(f"  ✓ {method_name} properly raises exception")
+        
+    finally:
+        # Clean up
+        if os.path.exists(cab_file):
+            os.unlink(cab_file)
 
 def test_requirement_3_5():
     """Test that all requirements from Section 3.5 are implemented"""
@@ -30,41 +87,11 @@ def test_requirement_3_5():
         
         # Requirement 1: Ensure _store_in_X methods raise exceptions on failure
         print("\n1. Testing _store_in_X methods raise exceptions on failure:")
+        print("  (Store method tests moved to parametrized test functions)")
         
-        store_methods = [
-            ('_store_in_redis', MemorySystem.REDIS),
-            ('_store_in_neo4j', MemorySystem.NEO4J),
-            ('_store_in_basic_memory', MemorySystem.BASIC_MEMORY)
-        ]
-        
-        test_failed = False
-        for method_name, system in store_methods:
-            try:
-                method = getattr(selector, method_name)
-                method({"test": "data"}, TaskType.UNKNOWN)
-                print(f"  ✗ {method_name} did not raise exception")
-                test_failed = True
-            except Exception as e:
-                print(f"  ✓ {method_name} properly raises exception: {type(e).__name__}")
-        
-        assert not test_failed, "Some _store_in_X methods did not raise exceptions as expected"
         # Requirement 2: Ensure _retrieve_from_X methods raise exceptions on failure
         print("\n2. Testing _retrieve_from_X methods raise exceptions on failure:")
-        
-        retrieve_methods = [
-            ('_retrieve_from_redis', MemorySystem.REDIS),
-            ('_retrieve_from_neo4j', MemorySystem.NEO4J),
-            ('_retrieve_from_basic_memory', MemorySystem.BASIC_MEMORY)
-        ]
-        
-        for method_name, system in retrieve_methods:
-            try:
-                method = getattr(selector, method_name)
-                method({"test": "query"}, TaskType.UNKNOWN)
-                print(f"  ✗ {method_name} did not raise exception")
-                return False
-            except Exception as e:
-                print(f"  ✓ {method_name} properly raises exception: {type(e).__name__}")
+        print("  (Retrieve method tests moved to parametrized test functions)")
         
         # Requirement 3: Test that exceptions trigger execute_with_fallback
         print("\n3. Testing exceptions trigger execute_with_fallback:")
@@ -80,8 +107,7 @@ def test_requirement_3_5():
         # Test that all failures are handled
         try:
             selector.execute_with_fallback("test task", failing_operation)
-            print("  ✗ execute_with_fallback should have raised exception after all failures")
-            return False
+            assert False, "execute_with_fallback should have raised exception after all failures"
         except Exception as e:
             print("  ✓ execute_with_fallback properly handles all system failures")
         
@@ -97,10 +123,10 @@ def test_requirement_3_5():
                 # Let's see what the primary selection was
                 primary_system, task_type = selector.select_memory_system("Find user relationships")
                 print(f"    Primary system selected: {primary_system}, Task type: {task_type}")
-                return False
+                assert False, f"Fallback not used correctly: {used_fallback}, {successful_system}"
         except Exception as e:
             print(f"  ✗ execute_with_fallback failed unexpectedly: {e}")
-            return False
+            assert False, f"execute_with_fallback failed unexpectedly: {e}"
         
         # Requirement 4: Log API errors via CABTracker
         print("\n4. Testing API errors are logged via CABTracker:")
@@ -126,10 +152,10 @@ def test_requirement_3_5():
                     else:
                         print(f"  ✗ API errors not logged with proper severity format")
                         print(f"    Content sample: {cab_content[:500]}...")
-                        return False
+                        assert False, "API errors not logged with proper severity format"
                 else:
                     print("  ✗ No API errors found in CAB log")
-                    return False
+                    assert False, "No API errors found in CAB log"
                 
                 if "context=" in cab_content and "metrics=" in cab_content:
                     print("  ✓ API errors logged with context and metrics")
@@ -138,22 +164,20 @@ def test_requirement_3_5():
                 else:
                     print("  ✗ API errors missing context or metrics")
                     print(f"    Content sample: {cab_content[:1000]}...")
-                    return False
+                    assert False, "API errors missing context or metrics"
         
         # Requirement 5: Integration with store_data and retrieve_data methods
         print("\n5. Testing integration with store_data and retrieve_data methods:")
         
         try:
             selector.store_data({"test": "data"}, "store user information")
-            print("  ✗ store_data should have failed with exceptions")
-            return False
+            assert False, "store_data should have failed with exceptions"
         except Exception:
             print("  ✓ store_data properly triggers fallback and fails appropriately")
         
         try:
             selector.retrieve_data({"query": "test"}, "find user information")
-            print("  ✗ retrieve_data should have failed with exceptions")
-            return False
+            assert False, "retrieve_data should have failed with exceptions"
         except Exception:
             print("  ✓ retrieve_data properly triggers fallback and fails appropriately")
         
@@ -165,7 +189,7 @@ def test_requirement_3_5():
         print("✓ API errors logged via CABTracker with proper severity, context, and metrics")
         print("✓ Integration with high-level store_data and retrieve_data methods")
         
-        return True
+        # Test passes if we reach here without assertion errors
     
     finally:
         # Clean up
@@ -175,8 +199,8 @@ def test_requirement_3_5():
 def main():
     """Run comprehensive requirements test"""
     try:
-        success = test_requirement_3_5()
-        return 0 if success else 1
+        test_requirement_3_5()
+        return 0
     except Exception as e:
         print(f"\nTest failed with error: {e}")
         import traceback
