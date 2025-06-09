@@ -9,6 +9,8 @@ import os
 import re
 from typing import Dict, List, Optional, Any, Tuple, NamedTuple
 from enum import Enum
+import requests
+import json
 
 # Initialize logger for the module
 logger = logging.getLogger(__name__)
@@ -66,6 +68,87 @@ class TaskAnalysis(NamedTuple):
     confidence: float
     reasoning: str
     patterns_matched: List[str]
+
+
+class BasicMemoryClient:
+    """Client for interacting with basicmachines-co/basic-memory REST API"""
+    
+    def __init__(self, base_url: str, auth_token: Optional[str] = None, timeout: int = 30):
+        """
+        Initialize Basic Memory client
+        
+        Args:
+            base_url: Base URL for the Basic Memory API
+            auth_token: Optional authentication token
+            timeout: Request timeout in seconds
+        """
+        self.base_url = base_url.rstrip('/')
+        self.timeout = timeout
+        self.session = requests.Session()
+        
+        # Set up authentication if provided
+        if auth_token:
+            self.session.headers.update({'Authorization': f'Bearer {auth_token}'})
+        
+        # Set common headers
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
+    
+    def store_entity(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Store an entity in Basic Memory"""
+        url = f"{self.base_url}/entities"
+        response = self.session.post(url, json=data, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+    
+    def search_entities(self, query: str, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Search for entities in Basic Memory"""
+        url = f"{self.base_url}/search"
+        payload = {'query': query}
+        if filters:
+            payload.update(filters)
+        
+        response = self.session.post(url, json=payload, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_entity(self, entity_id: str) -> Dict[str, Any]:
+        """Retrieve a specific entity by ID"""
+        url = f"{self.base_url}/entities/{entity_id}"
+        response = self.session.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+    
+    def update_entity(self, entity_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an existing entity"""
+        url = f"{self.base_url}/entities/{entity_id}"
+        response = self.session.put(url, json=data, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+    
+    def delete_entity(self, entity_id: str) -> None:
+        """Delete an entity by ID"""
+        url = f"{self.base_url}/entities/{entity_id}"
+        response = self.session.delete(url, timeout=self.timeout)
+        response.raise_for_status()
+    
+    def get_tree(self) -> Dict[str, Any]:
+        """Get the tree structure of entities"""
+        url = f"{self.base_url}/tree"
+        response = self.session.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+    
+    def health_check(self) -> bool:
+        """Check if the Basic Memory service is healthy"""
+        try:
+            url = f"{self.base_url}/health"
+            response = self.session.get(url, timeout=5)
+            return response.status_code == 200
+        except:
+            return False
 
 
 class IntentAnalyzer:
@@ -372,6 +455,8 @@ class MemorySelector:
 
             # Basic Memory Configuration
             'BASIC_MEMORY_ENABLED': os.getenv('BASIC_MEMORY_ENABLED', 'true').lower() == 'true',
+            'BASIC_MEMORY_URL': os.getenv('BASIC_MEMORY_URL'),
+            'BASIC_MEMORY_AUTH_TOKEN': os.getenv('BASIC_MEMORY_AUTH_TOKEN'),
             'BASIC_MEMORY_PATH': os.getenv('BASIC_MEMORY_PATH', '/data/obsidian'),
             'BASIC_MEMORY_SYNC': os.getenv('BASIC_MEMORY_SYNC', 'true').lower() == 'true',
             'BASIC_MEMORY_GIT_SYNC': os.getenv('BASIC_MEMORY_GIT_SYNC', 'false').lower() == 'true',
@@ -431,10 +516,12 @@ class MemorySelector:
                 config_warnings.append("NEO4J_PASSWORD not configured but Neo4j is enabled")
 
         if self.config.get('BASIC_MEMORY_ENABLED'):
+            basic_url = self.config.get('BASIC_MEMORY_URL')
             basic_path = self.config.get('BASIC_MEMORY_PATH')
-            if not basic_path:
-                config_warnings.append("BASIC_MEMORY_PATH not configured but Basic Memory is enabled")
-            elif not os.path.exists(basic_path):
+            
+            if not basic_url and not basic_path:
+                config_warnings.append("Either BASIC_MEMORY_URL or BASIC_MEMORY_PATH must be configured when Basic Memory is enabled")
+            elif basic_path and not os.path.exists(basic_path):
                 config_warnings.append(f"BASIC_MEMORY_PATH does not exist: {basic_path}")
 
         if not self.config.get('DISABLE_AUTH'):
@@ -510,11 +597,30 @@ class MemorySelector:
     def _get_basic_memory_client(self):
         """Get Basic Memory client instance (lazy initialization)"""
         if not self._basic_memory_client and self.config.get('BASIC_MEMORY_ENABLED'):
-            self._basic_memory_client = self._initialize_client(
-                client_type="Basic Memory",
-                config={'path': self.config.get('BASIC_MEMORY_PATH')},
-                create_client=lambda: f"BasicMemoryClient({self.config.get('BASIC_MEMORY_PATH')})"  # Placeholder
-            )
+            base_url = self.config.get('BASIC_MEMORY_URL')
+            if base_url:
+                # Use REST API client
+                self._basic_memory_client = self._initialize_client(
+                    client_type="Basic Memory",
+                    config={
+                        'url': base_url,
+                        'auth_token': self.config.get('BASIC_MEMORY_AUTH_TOKEN')
+                    },
+                    create_client=lambda: BasicMemoryClient(
+                        base_url=base_url,
+                        auth_token=self.config.get('BASIC_MEMORY_AUTH_TOKEN')
+                    )
+                )
+            else:
+                # Log that we need a URL for REST API access
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Configuration Warning",
+                        "BASIC_MEMORY_URL not configured - cannot create REST API client",
+                        severity='MEDIUM',
+                        context="Basic Memory enabled but no API URL provided"
+                    )
+                logger.warning("BASIC_MEMORY_URL not configured - cannot create REST API client")
         return self._basic_memory_client
 
     def _get_neo4j_client(self):
@@ -763,13 +869,46 @@ class MemorySelector:
                 )
             raise Exception("Basic Memory client not available")
         
-        # Placeholder implementation - would call actual Basic Memory operations
-        logger.info(f"Storing data in Basic Memory for task: {task}")
-        basic_path = self.config.get('BASIC_MEMORY_PATH')
-        if not basic_path or not os.path.exists(basic_path):
-            raise Exception("Basic Memory path not configured or does not exist")
-        
-        return {"status": "stored", "system": "basic_memory", "file_path": "mock_file_path"}
+        try:
+            # Use the actual Basic Memory client to store data
+            logger.info(f"Storing data in Basic Memory for task: {task}")
+            
+            # Map the data to Basic Memory entity format
+            entity_data = {
+                "content": data.get("content", str(data)),
+                "title": data.get("title", f"Entity for task: {task}"),
+                "tags": data.get("tags", []),
+                "metadata": {
+                    "task": task,
+                    "stored_at": data.get("timestamp"),
+                    "context": context
+                }
+            }
+            
+            result = client.store_entity(entity_data)
+            return {"status": "stored", "system": "basic_memory", "entity_id": result.get("id"), "result": result}
+            
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Basic Memory API request failed: {str(e)}"
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Task: {task}, URL: {self.config.get('BASIC_MEMORY_URL')}",
+                    metrics={"error_type": type(e).__name__}
+                )
+            raise Exception(error_msg)
+        except Exception as e:
+            error_msg = f"Basic Memory storage failed: {str(e)}"
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Storage Error",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception(error_msg)
 
     def _retrieve_from_redis(self, query: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
         """Retrieve data from Redis memory system"""
@@ -824,13 +963,50 @@ class MemorySelector:
                 )
             raise Exception("Basic Memory client not available")
         
-        # Placeholder implementation - would call actual Basic Memory operations
-        logger.info(f"Retrieving data from Basic Memory for task: {task}")
-        basic_path = self.config.get('BASIC_MEMORY_PATH')
-        if not basic_path or not os.path.exists(basic_path):
-            raise Exception("Basic Memory path not configured or does not exist")
-        
-        return {"status": "retrieved", "system": "basic_memory", "results": ["mock_basic_memory_result"]}
+        try:
+            # Use the actual Basic Memory client to retrieve data
+            logger.info(f"Retrieving data from Basic Memory for task: {task}")
+            
+            # Handle different types of queries
+            if "id" in query:
+                # Direct entity retrieval
+                result = client.get_entity(query["id"])
+                results = [result]
+            elif "search" in query or "query" in query:
+                # Search query
+                search_term = query.get("search") or query.get("query", "")
+                filters = query.get("filters")
+                search_result = client.search_entities(search_term, filters)
+                results = search_result.get("results", [])
+            else:
+                # General query - try searching with the whole query as a string
+                search_term = str(query)
+                search_result = client.search_entities(search_term)
+                results = search_result.get("results", [])
+            
+            return {"status": "retrieved", "system": "basic_memory", "results": results}
+            
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Basic Memory API request failed: {str(e)}"
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Task: {task}, URL: {self.config.get('BASIC_MEMORY_URL')}",
+                    metrics={"error_type": type(e).__name__}
+                )
+            raise Exception(error_msg)
+        except Exception as e:
+            error_msg = f"Basic Memory retrieval failed: {str(e)}"
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Retrieval Error",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception(error_msg)
 
     def get_fallback_chain(self, system: MemorySystem) -> List[MemorySystem]:
         """Get the fallback chain for a given memory system"""
