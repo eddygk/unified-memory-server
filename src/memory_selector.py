@@ -600,8 +600,8 @@ class MemorySelector:
                 return True
         
         # Check if the TEST_MODE environment variable is explicitly set
-        if self.config.get('TEST_MODE', 'false').lower() == 'true':
-            logger.info("Test environment detected via TEST_MODE configuration")
+        if os.getenv('TEST_MODE', 'false').lower() == 'true':
+            logger.info("Test environment detected via TEST_MODE environment variable")
             return True
         
         return False
