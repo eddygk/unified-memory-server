@@ -304,7 +304,7 @@ class BasicMemoryClient:
         if self.test_mode:
             try:
                 self._check_connectivity_or_skip("health_check")
-            except (socket.error, ConnectivityError, Exception):
+            except (socket.error, ConnectivityError):
                 return False  # Unreachable in test mode
         
         try:
