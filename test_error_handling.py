@@ -109,9 +109,7 @@ def test_fallback_chain_verification():
         print(f"{system.value} fallback chain: {[s.value for s in chain]}")
         
         # Verify each system has fallbacks
-        if len(chain) == 0:
-            print(f"WARNING: {system.value} has no fallback systems")
-            return False
+        assert len(chain) > 0, f"Configuration error: {system.value} has no fallback systems"
     
     return True
 
