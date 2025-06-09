@@ -70,6 +70,86 @@ class TaskAnalysis(NamedTuple):
     patterns_matched: List[str]
 
 
+class Neo4jMCPClient:
+    """Client for interacting with Neo4j MCP servers (mcp-neo4j-memory and mcp-neo4j-cypher)"""
+    
+    def __init__(self, memory_server_url: str, cypher_server_url: str, timeout: int = 30):
+        """
+        Initialize Neo4j MCP client
+        
+        Args:
+            memory_server_url: URL for the mcp-neo4j-memory server
+            cypher_server_url: URL for the mcp-neo4j-cypher server
+            timeout: Request timeout in seconds
+        """
+        self.memory_server_url = memory_server_url.rstrip('/')
+        self.cypher_server_url = cypher_server_url.rstrip('/')
+        self.timeout = timeout
+        self.session = requests.Session()
+        
+        # Set common headers for MCP requests
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
+    
+    def send_memory_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Send request to mcp-neo4j-memory server"""
+        return self._send_mcp_request(self.memory_server_url, method, params)
+    
+    def send_cypher_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Send request to mcp-neo4j-cypher server"""
+        return self._send_mcp_request(self.cypher_server_url, method, params)
+    
+    def _send_mcp_request(self, url: str, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Send MCP request to specified server"""
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": method,
+            "params": params or {}
+        }
+        
+        response = self.session.post(url, json=payload, timeout=self.timeout)
+        response.raise_for_status()
+        
+        result = response.json()
+        
+        # Check for JSON-RPC errors
+        if "error" in result:
+            raise Exception(f"MCP Error: {result['error']}")
+        
+        return result.get("result", {})
+    
+    def create_entities(self, entities: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Create entities using mcp-neo4j-memory"""
+        return self.send_memory_request("create_entities", {"entities": entities})
+    
+    def search_nodes(self, query: str, filters: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Search nodes using mcp-neo4j-memory"""
+        params = {"query": query}
+        if filters:
+            params.update(filters)
+        return self.send_memory_request("search_nodes", params)
+    
+    def execute_cypher(self, query: str, parameters: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Execute raw Cypher query using mcp-neo4j-cypher"""
+        params = {"query": query}
+        if parameters:
+            params["parameters"] = parameters
+        return self.send_cypher_request("execute_cypher", params)
+    
+    def health_check(self) -> bool:
+        """Check if both MCP servers are healthy"""
+        try:
+            # Try a simple request to both servers
+            self.send_memory_request("health_check")
+            self.send_cypher_request("health_check")
+            return True
+        except:
+            return False
+
+
 class BasicMemoryClient:
     """Client for interacting with basicmachines-co/basic-memory REST API"""
     
@@ -452,6 +532,10 @@ class MemorySelector:
             'NEO4J_PASSWORD': os.getenv('NEO4J_PASSWORD'),
             'NEO4J_DATABASE': os.getenv('NEO4J_DATABASE', 'neo4j'),
             'NEO4J_ENCRYPTION': os.getenv('NEO4J_ENCRYPTION', 'false').lower() == 'true',
+            
+            # Neo4j MCP Server Configuration
+            'NEO4J_MCP_MEMORY_URL': os.getenv('NEO4J_MCP_MEMORY_URL', 'http://neo4j:8001'),
+            'NEO4J_MCP_CYPHER_URL': os.getenv('NEO4J_MCP_CYPHER_URL', 'http://neo4j:8002'),
 
             # Basic Memory Configuration
             'BASIC_MEMORY_ENABLED': os.getenv('BASIC_MEMORY_ENABLED', 'true').lower() == 'true',
@@ -624,12 +708,33 @@ class MemorySelector:
         return self._basic_memory_client
 
     def _get_neo4j_client(self):
-        """Get Neo4j client instance (lazy initialization)"""
+        """Get Neo4j MCP client instance (lazy initialization)"""
         if not self._neo4j_client and self.config.get('NEO4J_ENABLED'):
+            memory_url = self.config.get('NEO4J_MCP_MEMORY_URL')
+            cypher_url = self.config.get('NEO4J_MCP_CYPHER_URL')
+            
+            if not memory_url or not cypher_url or memory_url.strip() == '' or cypher_url.strip() == '':
+                error_msg = "NEO4J_MCP_MEMORY_URL and NEO4J_MCP_CYPHER_URL must be configured when Neo4j is enabled"
+                logger.error(error_msg)
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Configuration Error",
+                        error_msg,
+                        severity='HIGH',
+                        context="Neo4j MCP client initialization"
+                    )
+                return None
+            
             self._neo4j_client = self._initialize_client(
-                client_type="Neo4j",
-                config={'url': self.config.get('NEO4J_URL')},
-                create_client=lambda: f"Neo4jClient({self.config.get('NEO4J_URL')})"  # Placeholder
+                client_type="Neo4j MCP",
+                config={
+                    'memory_url': memory_url,
+                    'cypher_url': cypher_url
+                },
+                create_client=lambda: Neo4jMCPClient(
+                    memory_server_url=memory_url,
+                    cypher_server_url=cypher_url
+                )
             )
         return self._neo4j_client
 
@@ -843,18 +948,54 @@ class MemorySelector:
             if self.cab_tracker:
                 self.cab_tracker.log_suggestion(
                     "Missing Implementation", 
-                    "Neo4j client not available for storage operation",
+                    "Neo4j MCP client not available for storage operation",
                     severity='HIGH',
                     context=f"Task: {task}"
                 )
-            raise Exception("Neo4j client not available")
+            raise Exception("Neo4j MCP client not available")
         
-        # Placeholder implementation - would call actual Neo4j operations
-        logger.info(f"Storing data in Neo4j for task: {task}")
-        if not self.config.get('NEO4J_URL'):
-            raise Exception("Neo4j URL not configured")
-        
-        return {"status": "stored", "system": "neo4j", "node_id": "mock_neo4j_id"}
+        try:
+            logger.info(f"Storing data in Neo4j via MCP for task: {task}")
+            
+            # Map the data to Neo4j entity format for MCP
+            entities = []
+            if isinstance(data, dict):
+                entity = {
+                    "labels": ["Entity"],
+                    "properties": {
+                        "content": data.get("content", str(data)),
+                        "title": data.get("title", f"Entity for task: {task}"),
+                        "task": task,
+                        "stored_at": data.get("timestamp"),
+                        **data.get("metadata", {})
+                    }
+                }
+                entities.append(entity)
+            
+            result = client.create_entities(entities)
+            return {"status": "stored", "system": "neo4j_mcp", "result": result}
+            
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Neo4j MCP API request failed: {str(e)}"
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Task: {task}, Memory URL: {self.config.get('NEO4J_MCP_MEMORY_URL')}",
+                    metrics={"error_type": type(e).__name__}
+                )
+            raise Exception(error_msg)
+        except Exception as e:
+            error_msg = f"Neo4j MCP storage failed: {str(e)}"
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Storage Error",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception(error_msg)
 
     def _store_in_basic_memory(self, data: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
         """Store data in Basic Memory system"""
@@ -937,18 +1078,57 @@ class MemorySelector:
             if self.cab_tracker:
                 self.cab_tracker.log_suggestion(
                     "Missing Implementation",
-                    "Neo4j client not available for retrieval operation",
+                    "Neo4j MCP client not available for retrieval operation",
                     severity='HIGH',
                     context=f"Task: {task}"
                 )
-            raise Exception("Neo4j client not available")
+            raise Exception("Neo4j MCP client not available")
         
-        # Placeholder implementation - would call actual Neo4j operations
-        logger.info(f"Retrieving data from Neo4j for task: {task}")
-        if not self.config.get('NEO4J_URL'):
-            raise Exception("Neo4j URL not configured")
-        
-        return {"status": "retrieved", "system": "neo4j", "results": ["mock_neo4j_result"]}
+        try:
+            logger.info(f"Retrieving data from Neo4j via MCP for task: {task}")
+            
+            # Handle different types of queries
+            if "cypher" in query:
+                # Direct Cypher query
+                cypher_query = query["cypher"]
+                parameters = query.get("parameters", {})
+                result = client.execute_cypher(cypher_query, parameters)
+                results = result.get("records", [])
+            elif "search" in query or "query" in query:
+                # Search query using memory server
+                search_term = query.get("search") or query.get("query", "")
+                filters = query.get("filters", {})
+                search_result = client.search_nodes(search_term, filters)
+                results = search_result.get("nodes", [])
+            else:
+                # General query - convert to search
+                search_term = str(query)
+                search_result = client.search_nodes(search_term)
+                results = search_result.get("nodes", [])
+            
+            return {"status": "retrieved", "system": "neo4j_mcp", "results": results}
+            
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Neo4j MCP API request failed: {str(e)}"
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "API Error",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Task: {task}, Memory URL: {self.config.get('NEO4J_MCP_MEMORY_URL')}",
+                    metrics={"error_type": type(e).__name__}
+                )
+            raise Exception(error_msg)
+        except Exception as e:
+            error_msg = f"Neo4j MCP retrieval failed: {str(e)}"
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Retrieval Error",
+                    error_msg,
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception(error_msg)
 
     def _retrieve_from_basic_memory(self, query: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
         """Retrieve data from Basic Memory system"""
@@ -1094,8 +1274,17 @@ class MemoryPropagator:
 if __name__ == "__main__":
     # Mock CAB tracker for demonstration purposes
     class MockCabTracker:
+        def __init__(self):
+            self.initialized = True
+        
         def log_suggestion(self, *args, **kwargs):
             print(f"CAB LOG: {args} {kwargs}")
+            
+        def log_memory_operation(self, *args, **kwargs):
+            print(f"CAB MEMORY OP: {args} {kwargs}")
+            
+        def log_missing_implementation(self, *args, **kwargs):
+            print(f"CAB MISSING IMPL: {args} {kwargs}")
 
     # Initialize
     cab_tracker = MockCabTracker()
@@ -1117,7 +1306,17 @@ if __name__ == "__main__":
     def mock_operation(system, task, context):
         print(f"Attempting operation on: {system.value}")
         if system == MemorySystem.NEO4J:
-            raise Exception("Neo4j unavailable")
+            # Try to get the actual Neo4j client to test initialization
+            try:
+                client = selector._get_neo4j_client()
+                if client:
+                    print(f"Neo4j MCP client initialized successfully: {type(client).__name__}")
+                    # This would be a real operation failing due to server unavailability
+                    raise Exception("Neo4j MCP servers unavailable (expected - servers not running)")
+                else:
+                    raise Exception("Neo4j MCP client initialization failed")
+            except Exception as e:
+                raise Exception(f"Neo4j operation failed: {str(e)}")
         return f"Result from {system.value}"
 
     result, successful_system, used_fallback = selector.execute_with_fallback(
