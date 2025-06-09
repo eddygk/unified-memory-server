@@ -58,6 +58,11 @@ class MemorySelector:
             validate_config: Whether to validate loaded configuration (default: True)
         """
         self.cab_tracker = cab_tracker
+        
+        # Initialize CAB tracker session if provided
+        if self.cab_tracker and not self.cab_tracker.initialized:
+            self.cab_tracker.initialize_session()
+        
         self.config = self._load_config(config_path)
 
         if validate_config:
@@ -221,7 +226,7 @@ class MemorySelector:
         for warning in config_warnings:
             logger.warning(f"Configuration warning: {warning}")
             if self.cab_tracker:
-                self.cab_tracker.log_suggestion("Configuration Warning", warning, severity='MEDIUM')
+                self.cab_tracker.log_suggestion("Configuration Warning", warning, severity='MEDIUM', context="Configuration validation")
 
     def _initialize_rules(self) -> Dict[TaskType, MemorySystem]:
         """Initialize task type to memory system mapping"""
@@ -329,35 +334,322 @@ class MemorySelector:
 
     def execute_with_fallback(self, task: str, operation_func: callable, context: Optional[Dict[str, Any]] = None) -> Tuple[Any, MemorySystem, bool]:
         """Execute operation with automatic fallback"""
-        # (Implementation not in conflict, retained from original)
+        import time
+        start_time = time.time()
+        
         primary_system, task_type = self.select_memory_system(task, context)
         fallback_chain = [primary_system] + self._fallback_chains.get(primary_system, [])
         last_error = None
+        
         for i, system in enumerate(fallback_chain):
+            operation_start = time.time()
             try:
                 result = operation_func(system, task, context)
+                operation_duration = (time.time() - operation_start) * 1000  # Convert to ms
+                
+                # Log successful operation
+                if self.cab_tracker:
+                    self.cab_tracker.log_memory_operation(
+                        operation=operation_func.__name__ if hasattr(operation_func, '__name__') else "memory_operation",
+                        system=system.value,
+                        success=True,
+                        duration_ms=operation_duration,
+                        fallback_used=(i > 0)
+                    )
+                
                 if i > 0:
                     logger.info(f"Successfully used fallback system {system.value}")
+                    if self.cab_tracker:
+                        self.cab_tracker.log_suggestion(
+                            "Fallback Success",
+                            f"Primary system failed, successfully fell back to {system.value}",
+                            severity='MEDIUM',
+                            context=f"Task: {task[:50]}...",
+                            metrics={"primary_system": primary_system.value, "successful_system": system.value}
+                        )
+                
                 return result, system, (i > 0)
+                
             except Exception as e:
+                operation_duration = (time.time() - operation_start) * 1000
                 last_error = e
                 logger.warning(f"System {system.value} failed: {str(e)}")
+                
+                # Log API error
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "API Error",
+                        f"{system.value} operation failed: {str(e)}",
+                        severity='HIGH' if i == 0 else 'MEDIUM',  # Primary failure is more severe
+                        context=f"Task: {task[:50]}..., System: {system.value}",
+                        metrics={"duration_ms": operation_duration, "error_type": type(e).__name__}
+                    )
                 continue
+        
+        total_duration = (time.time() - start_time) * 1000
         logger.error(f"All systems failed for task: {task}")
+        
+        # Log complete failure
+        if self.cab_tracker:
+            self.cab_tracker.log_suggestion(
+                "Complete System Failure",
+                f"All memory systems failed for task: {task[:50]}...",
+                severity='CRITICAL',
+                context=f"Systems tried: {[s.value for s in fallback_chain]}, Last error: {str(last_error)}",
+                metrics={"total_duration_ms": total_duration, "systems_attempted": len(fallback_chain)}
+            )
+        
         raise Exception(f"All memory systems failed. Last error: {last_error}")
+
+    def store_data(self, data: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Tuple[Any, MemorySystem, bool]:
+        """Store data in appropriate memory system with fallback"""
+        def store_operation(system: MemorySystem, task: str, context: Optional[Dict[str, Any]]):
+            return self._store_in_system(system, data, task, context)
+        
+        return self.execute_with_fallback(task, store_operation, context)
+
+    def retrieve_data(self, query: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Tuple[Any, MemorySystem, bool]:
+        """Retrieve data from appropriate memory system with fallback"""
+        def retrieve_operation(system: MemorySystem, task: str, context: Optional[Dict[str, Any]]):
+            return self._retrieve_from_system(system, query, task, context)
+        
+        return self.execute_with_fallback(task, retrieve_operation, context)
+
+    def _store_in_system(self, system: MemorySystem, data: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Store data in specific memory system"""
+        if system == MemorySystem.REDIS:
+            return self._store_in_redis(data, task, context)
+        elif system == MemorySystem.NEO4J:
+            return self._store_in_neo4j(data, task, context)
+        elif system == MemorySystem.BASIC_MEMORY:
+            return self._store_in_basic_memory(data, task, context)
+        else:
+            if self.cab_tracker:
+                self.cab_tracker.log_missing_implementation(
+                    f"Storage operation for {system.value}",
+                    f"Cannot store data in {system.value} - implementation missing"
+                )
+            raise NotImplementedError(f"Storage not implemented for {system.value}")
+
+    def _retrieve_from_system(self, system: MemorySystem, query: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Retrieve data from specific memory system"""
+        if system == MemorySystem.REDIS:
+            return self._retrieve_from_redis(query, task, context)
+        elif system == MemorySystem.NEO4J:
+            return self._retrieve_from_neo4j(query, task, context)
+        elif system == MemorySystem.BASIC_MEMORY:
+            return self._retrieve_from_basic_memory(query, task, context)
+        else:
+            if self.cab_tracker:
+                self.cab_tracker.log_missing_implementation(
+                    f"Retrieval operation for {system.value}",
+                    f"Cannot retrieve data from {system.value} - implementation missing"
+                )
+            raise NotImplementedError(f"Retrieval not implemented for {system.value}")
+
+    def _store_in_redis(self, data: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Store data in Redis memory system"""
+        client = self._get_redis_client()
+        if not client:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Missing Implementation",
+                    "Redis client not available for storage operation",
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception("Redis client not available")
+        
+        # Placeholder implementation - would call actual Redis operations
+        logger.info(f"Storing data in Redis for task: {task}")
+        # In real implementation, this would fail if Redis is not configured properly
+        if not self.config.get('REDIS_URL'):
+            raise Exception("Redis URL not configured")
+        
+        return {"status": "stored", "system": "redis", "data_id": "mock_redis_id"}
+
+    def _store_in_neo4j(self, data: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Store data in Neo4j memory system"""
+        client = self._get_neo4j_client()
+        if not client:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Missing Implementation", 
+                    "Neo4j client not available for storage operation",
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception("Neo4j client not available")
+        
+        # Placeholder implementation - would call actual Neo4j operations
+        logger.info(f"Storing data in Neo4j for task: {task}")
+        if not self.config.get('NEO4J_URL'):
+            raise Exception("Neo4j URL not configured")
+        
+        return {"status": "stored", "system": "neo4j", "node_id": "mock_neo4j_id"}
+
+    def _store_in_basic_memory(self, data: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Store data in Basic Memory system"""
+        client = self._get_basic_memory_client()
+        if not client:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Missing Implementation",
+                    "Basic Memory client not available for storage operation", 
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception("Basic Memory client not available")
+        
+        # Placeholder implementation - would call actual Basic Memory operations
+        logger.info(f"Storing data in Basic Memory for task: {task}")
+        basic_path = self.config.get('BASIC_MEMORY_PATH')
+        if not basic_path or not os.path.exists(basic_path):
+            raise Exception("Basic Memory path not configured or does not exist")
+        
+        return {"status": "stored", "system": "basic_memory", "file_path": "mock_file_path"}
+
+    def _retrieve_from_redis(self, query: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Retrieve data from Redis memory system"""
+        client = self._get_redis_client()
+        if not client:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Missing Implementation",
+                    "Redis client not available for retrieval operation",
+                    severity='HIGH', 
+                    context=f"Task: {task}"
+                )
+            raise Exception("Redis client not available")
+        
+        # Placeholder implementation - would call actual Redis operations
+        logger.info(f"Retrieving data from Redis for task: {task}")
+        if not self.config.get('REDIS_URL'):
+            raise Exception("Redis URL not configured")
+        
+        return {"status": "retrieved", "system": "redis", "results": ["mock_redis_result"]}
+
+    def _retrieve_from_neo4j(self, query: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Retrieve data from Neo4j memory system"""
+        client = self._get_neo4j_client()
+        if not client:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Missing Implementation",
+                    "Neo4j client not available for retrieval operation",
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception("Neo4j client not available")
+        
+        # Placeholder implementation - would call actual Neo4j operations
+        logger.info(f"Retrieving data from Neo4j for task: {task}")
+        if not self.config.get('NEO4J_URL'):
+            raise Exception("Neo4j URL not configured")
+        
+        return {"status": "retrieved", "system": "neo4j", "results": ["mock_neo4j_result"]}
+
+    def _retrieve_from_basic_memory(self, query: Dict[str, Any], task: str, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Retrieve data from Basic Memory system"""
+        client = self._get_basic_memory_client()
+        if not client:
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Missing Implementation",
+                    "Basic Memory client not available for retrieval operation",
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception("Basic Memory client not available")
+        
+        # Placeholder implementation - would call actual Basic Memory operations
+        logger.info(f"Retrieving data from Basic Memory for task: {task}")
+        basic_path = self.config.get('BASIC_MEMORY_PATH')
+        if not basic_path or not os.path.exists(basic_path):
+            raise Exception("Basic Memory path not configured or does not exist")
+        
+        return {"status": "retrieved", "system": "basic_memory", "results": ["mock_basic_memory_result"]}
+
+    def get_fallback_chain(self, system: MemorySystem) -> List[MemorySystem]:
+        """Get the fallback chain for a given memory system"""
+        return self._fallback_chains.get(system, [])
 
 
 class MemoryPropagator:
     """Handles cross-system data propagation"""
-    # (Class not in conflict, retained from original)
     def __init__(self, memory_clients: Dict[MemorySystem, Any], cab_tracker=None):
         self.clients = memory_clients
         self.cab_tracker = cab_tracker
 
     def propagate_data(self, data: Any, source_system: MemorySystem, data_type: str, entity_id: Optional[str] = None):
-        # Placeholder for propagation logic
+        """Propagate data from source system to relevant destination systems"""
         logger.info(f"Propagating '{data_type}' from {source_system.value} for entity '{entity_id}'")
-        return {}
+        
+        propagation_results = {}
+        inconsistencies_detected = []
+        
+        # Determine which systems should receive this data type
+        target_systems = self._get_propagation_targets(source_system, data_type)
+        
+        for target_system in target_systems:
+            try:
+                # In a real implementation, this would perform actual data synchronization
+                logger.info(f"Propagating to {target_system.value}")
+                
+                # Simulate checking for data consistency
+                if self._check_data_consistency(data, source_system, target_system, entity_id):
+                    propagation_results[target_system.value] = {"status": "success", "synchronized": True}
+                else:
+                    inconsistencies_detected.append({
+                        "source": source_system.value,
+                        "target": target_system.value,
+                        "entity_id": entity_id,
+                        "data_type": data_type
+                    })
+                    propagation_results[target_system.value] = {"status": "inconsistent", "synchronized": False}
+                    
+            except Exception as e:
+                logger.error(f"Failed to propagate to {target_system.value}: {e}")
+                propagation_results[target_system.value] = {"status": "error", "error": str(e)}
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Propagation Error",
+                        f"Failed to propagate {data_type} from {source_system.value} to {target_system.value}",
+                        severity='HIGH',
+                        context=f"Entity: {entity_id}, Error: {str(e)}",
+                        metrics={"source_system": source_system.value, "target_system": target_system.value}
+                    )
+        
+        # Log detected inconsistencies
+        if inconsistencies_detected and self.cab_tracker:
+            for inconsistency in inconsistencies_detected:
+                self.cab_tracker.log_data_inconsistency(
+                    entity=inconsistency["entity_id"] or "unknown",
+                    systems=[inconsistency["source"], inconsistency["target"]],
+                    inconsistency_type=f"{inconsistency['data_type']} data mismatch"
+                )
+        
+        return propagation_results
+    
+    def _get_propagation_targets(self, source_system: MemorySystem, data_type: str) -> List[MemorySystem]:
+        """Determine which systems should receive propagated data"""
+        # Example propagation rules - in real implementation would be more sophisticated
+        if data_type == "user_profile":
+            return [sys for sys in MemorySystem if sys != source_system]
+        elif data_type == "relationship":
+            return [MemorySystem.NEO4J, MemorySystem.REDIS] if source_system != MemorySystem.NEO4J else [MemorySystem.REDIS]
+        elif data_type == "conversation":
+            return [MemorySystem.REDIS] if source_system != MemorySystem.REDIS else []
+        else:
+            return []
+    
+    def _check_data_consistency(self, data: Any, source_system: MemorySystem, target_system: MemorySystem, entity_id: Optional[str]) -> bool:
+        """Check if data is consistent between systems"""
+        # Placeholder implementation - in real system would compare actual data
+        # For testing purposes, simulate some inconsistencies
+        import random
+        return random.choice([True, True, True, False])  # 75% consistent, 25% inconsistent
 
 
 # Example usage pattern
