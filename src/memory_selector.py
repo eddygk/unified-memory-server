@@ -7,6 +7,7 @@ Implements intelligent routing to appropriate memory systems based on task type
 import logging
 import os
 import re
+import socket
 import sys
 from typing import Dict, List, Optional, Any, Tuple, NamedTuple
 from enum import Enum
@@ -303,7 +304,7 @@ class BasicMemoryClient:
         if self.test_mode:
             try:
                 self._check_connectivity_or_skip("health_check")
-            except Exception:
+            except (socket.error, ConnectivityError, Exception):
                 return False  # Unreachable in test mode
         
         try:
