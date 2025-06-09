@@ -876,6 +876,32 @@ class MemorySelector:
             )
         return self._neo4j_client
 
+    def _ensure_neo4j_client(self, operation_type: str, task: str):
+        """
+        Ensure Neo4j MCP client is available and return it.
+        
+        Args:
+            operation_type: Type of operation (e.g., "storage", "retrieval") for logging
+            task: Task context for logging
+            
+        Returns:
+            Neo4jMCPClient instance
+            
+        Raises:
+            Exception: If Neo4j MCP client is not available
+        """
+        if not self._get_neo4j_client():
+            if self.cab_tracker:
+                self.cab_tracker.log_suggestion(
+                    "Missing Implementation",
+                    f"Neo4j MCP client not available for {operation_type} operation",
+                    severity='HIGH',
+                    context=f"Task: {task}"
+                )
+            raise Exception("Neo4j MCP client not available")
+        
+        return self._neo4j_client
+
     def get_task_analysis(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskAnalysis:
         """Get detailed analysis of task using enhanced intent recognition
         
@@ -1086,19 +1112,8 @@ class MemorySelector:
         Targets mcp-neo4j-memory for entity/relation operations or mcp-neo4j-cypher for raw queries.
         Constructs appropriate MCP JSON payloads and handles responses and errors.
         """
-        # Check that the Neo4j MCP client is available
-        if not self._get_neo4j_client():
-            if self.cab_tracker:
-                self.cab_tracker.log_suggestion(
-                    "Missing Implementation", 
-                    "Neo4j MCP client not available for storage operation",
-                    severity='HIGH',
-                    context=f"Task: {task}"
-                )
-            raise Exception("Neo4j MCP client not available")
-        
-        # Assign the client to a variable for use
-        client = self._neo4j_client
+        # Ensure Neo4j MCP client is available
+        client = self._ensure_neo4j_client("storage", task)
         
         try:
             logger.info(f"Storing data in Neo4j via MCP for task: {task}")
@@ -1315,19 +1330,8 @@ class MemorySelector:
         Targets mcp-neo4j-memory for entity/relation operations or mcp-neo4j-cypher for raw queries.
         Constructs appropriate MCP JSON payloads and handles responses and errors.
         """
-        # Check that the Neo4j MCP client is available
-        if not self._get_neo4j_client():
-            if self.cab_tracker:
-                self.cab_tracker.log_suggestion(
-                    "Missing Implementation",
-                    "Neo4j MCP client not available for retrieval operation",
-                    severity='HIGH',
-                    context=f"Task: {task}"
-                )
-            raise Exception("Neo4j MCP client not available")
-        
-        # Assign the client to a variable for use
-        client = self._neo4j_client
+        # Ensure Neo4j MCP client is available
+        client = self._ensure_neo4j_client("retrieval", task)
         
         try:
             logger.info(f"Retrieving data from Neo4j via MCP for task: {task}")
