@@ -42,7 +42,7 @@ def test_requirement_3_5():
                 method = getattr(selector, method_name)
                 method({"test": "data"}, TaskType.UNKNOWN)
                 print(f"  ✗ {method_name} did not raise exception")
-                return False
+                test_failed = True
             except Exception as e:
                 print(f"  ✓ {method_name} properly raises exception: {type(e).__name__}")
         
