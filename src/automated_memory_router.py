@@ -461,7 +461,7 @@ class AutomatedMemoryRouter:
     def __init__(self, cab_tracker=None, config_path=None, validate_config=True):
         """Initialize the automated router"""
         # Initialize core memory selector for fallback and system management
-        self.memory_selector = MemorySelector(cab_tracker, config_path, validate_config)
+        self.memory_selector = MemorySelector(cab_tracker, config_path=config_path, validate_config=validate_config)
         
         # Initialize analysis components
         self.intent_analyzer = IntentAnalyzer()
