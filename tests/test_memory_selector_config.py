@@ -158,6 +158,12 @@ class TestMemorySelectorConfig(unittest.TestCase):
                 self.assertEqual(os.environ.get('VALID_KEY'), 'valid_value')
                 self.assertEqual(os.environ.get('ANOTHER_VALID'), 'another_value')
                 
+                # Should have logged warning for malformed line
+                mock_logger.warning.assert_called()
+                warning_calls = [call for call in mock_logger.warning.call_args_list 
+                               if 'INVALID_LINE_NO_EQUALS' in str(call) and 'Malformed line' in str(call)]
+                self.assertTrue(len(warning_calls) > 0, "Expected warning to be logged for malformed line 'INVALID_LINE_NO_EQUALS'")
+                
         finally:
             os.unlink(temp_file.name)
             # Clean up environment variables
