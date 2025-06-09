@@ -50,6 +50,14 @@ class IntentAnalyzer:
 - "search for related documents"
 - "semantic search"
 
+#### Analyze Patterns
+- "analyze the data"
+- "examine the relationships"
+- "investigate the patterns"
+- "study the connections"
+- "assess the information"
+- "evaluate the results"
+
 ### 3. Entity Extraction
 
 The system identifies key entities from task text:
