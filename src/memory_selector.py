@@ -1627,15 +1627,7 @@ class MemorySelector:
         logger.info(f"Propagating {data_type} to Redis for entity {entity_id}")
         
         # Enhance data with propagation metadata
-        propagation_data = {
-            **data,
-            "_propagation_metadata": {
-                "entity_id": entity_id,
-                "data_type": data_type,
-                "propagated_at": data.get("timestamp"),
-                "propagation_task": task
-            }
-        }
+        propagation_data = self._enrich_with_propagation_metadata(data, data_type, entity_id, task)
         
         return self._store_in_redis(propagation_data, task, context)
 
