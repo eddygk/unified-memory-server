@@ -19,12 +19,14 @@ class TestMemorySelectorConstructorFix(unittest.TestCase):
     def test_keyword_only_parameters_work(self):
         """Test that keyword-only parameters work correctly."""
         # All these should work
+        selector0 = MemorySelector()
         selector1 = MemorySelector(validate_config=False)
         selector2 = MemorySelector(config_path=None, validate_config=False)
         selector3 = MemorySelector(self.mock_cab_tracker, validate_config=False)
         selector4 = MemorySelector(self.mock_cab_tracker, config_path=None, validate_config=False)
         
         # Verify they were created successfully
+        self.assertIsNotNone(selector0)
         self.assertIsNotNone(selector1)
         self.assertIsNotNone(selector2)
         self.assertIsNotNone(selector3)
