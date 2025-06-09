@@ -1560,7 +1560,6 @@ class MemorySelector:
         logger.info(f"Propagating '{data_type}' from {source_system.value} for entity '{entity_id}'")
         
         propagation_results = {}
-        inconsistencies_detected = []
         
         # Determine which systems should receive this data type
         target_systems = self._get_propagation_targets(source_system, data_type)
