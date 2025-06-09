@@ -12,12 +12,12 @@ from cab_tracker import CABTracker
 import tempfile
 import pytest
 
-@pytest.mark.parametrize("method_name,system", [
-    ('_store_in_redis', MemorySystem.REDIS),
-    ('_store_in_neo4j', MemorySystem.NEO4J),
-    ('_store_in_basic_memory', MemorySystem.BASIC_MEMORY)
+@pytest.mark.parametrize("method_name", [
+    '_store_in_redis',
+    '_store_in_neo4j',
+    '_store_in_basic_memory'
 ])
-def test_store_methods_raise_exceptions(method_name, system):
+def test_store_methods_raise_exceptions(method_name):
     """Test that _store_in_X methods raise exceptions on failure"""
     # Create a temporary CAB file for testing
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
