@@ -161,3 +161,4 @@ unified-memory-server.code-workspace
 cab-suggestions.md
 test_config.py
 debug_config.py
+demo_cab_integration.py
