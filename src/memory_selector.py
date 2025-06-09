@@ -113,10 +113,8 @@ class Neo4jMCPClient:
             parsed_url = urlparse(url)
             hostname = parsed_url.hostname
             
-            # Common internal Docker hostnames that won't resolve in development
-            internal_hostnames = ['neo4j', 'basic-memory', 'redis']
-            
-            if hostname in internal_hostnames:
+            # Check if the hostname is in the list of internal Docker hostnames
+            if hostname in INTERNAL_HOSTNAMES:
                 # Try a quick connectivity check first
                 try:
                     import socket
