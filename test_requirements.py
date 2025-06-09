@@ -10,6 +10,69 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 from memory_selector import MemorySelector, MemorySystem, TaskType
 from cab_tracker import CABTracker
 import tempfile
+import pytest
+
+
+@pytest.fixture
+def test_setup():
+    """Setup fixture for tests that provides CAB tracker and memory selector"""
+    # Create a temporary CAB file for testing
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        cab_file = f.name
+    
+    cab_tracker = CABTracker(cab_file)
+    selector = MemorySelector(cab_tracker)
+    
+    yield selector, cab_tracker, cab_file
+    
+    # Clean up
+    if os.path.exists(cab_file):
+        os.unlink(cab_file)
+
+
+@pytest.mark.parametrize("method_name,system", [
+    ('_store_in_redis', MemorySystem.REDIS),
+    ('_store_in_neo4j', MemorySystem.NEO4J),
+    ('_store_in_basic_memory', MemorySystem.BASIC_MEMORY)
+])
+def test_store_methods_raise_exceptions(test_setup, method_name, system):
+    """Test that individual _store_in_X methods raise exceptions on failure
+    
+    This parametrized test improves test granularity and reporting by creating
+    separate test cases for each store method, as suggested in the code review.
+    """
+    selector, cab_tracker, cab_file = test_setup
+    
+    print(f"\nTesting {method_name} raises exception on failure:")
+    
+    with pytest.raises(Exception) as exc_info:
+        method = getattr(selector, method_name)
+        method({"test": "data"}, TaskType.UNKNOWN)
+    
+    print(f"  ✓ {method_name} properly raises exception: {type(exc_info.value).__name__}")
+
+
+@pytest.mark.parametrize("method_name,system", [
+    ('_retrieve_from_redis', MemorySystem.REDIS),
+    ('_retrieve_from_neo4j', MemorySystem.NEO4J),
+    ('_retrieve_from_basic_memory', MemorySystem.BASIC_MEMORY)
+])
+def test_retrieve_methods_raise_exceptions(test_setup, method_name, system):
+    """Test that individual _retrieve_from_X methods raise exceptions on failure
+    
+    This parametrized test improves test granularity and reporting by creating
+    separate test cases for each retrieve method, as suggested in the code review.
+    """
+    selector, cab_tracker, cab_file = test_setup
+    
+    print(f"\nTesting {method_name} raises exception on failure:")
+    
+    with pytest.raises(Exception) as exc_info:
+        method = getattr(selector, method_name)
+        method({"test": "query"}, TaskType.UNKNOWN)
+    
+    print(f"  ✓ {method_name} properly raises exception: {type(exc_info.value).__name__}")
+
 
 def test_requirement_3_5():
     """Test that all requirements from Section 3.5 are implemented"""
@@ -28,43 +91,10 @@ def test_requirement_3_5():
         
         print("✓ CABTracker initialized and passed to MemorySelector")
         
-        # Requirement 1: Ensure _store_in_X methods raise exceptions on failure
-        print("\n1. Testing _store_in_X methods raise exceptions on failure:")
-        
-        store_methods = [
-            ('_store_in_redis', MemorySystem.REDIS),
-            ('_store_in_neo4j', MemorySystem.NEO4J),
-            ('_store_in_basic_memory', MemorySystem.BASIC_MEMORY)
-        ]
-        
-        test_failed = False
-        for method_name, system in store_methods:
-            try:
-                method = getattr(selector, method_name)
-                method({"test": "data"}, TaskType.UNKNOWN)
-                print(f"  ✗ {method_name} did not raise exception")
-                test_failed = True
-            except Exception as e:
-                print(f"  ✓ {method_name} properly raises exception: {type(e).__name__}")
-        
-        assert not test_failed, "Some _store_in_X methods did not raise exceptions as expected"
-        # Requirement 2: Ensure _retrieve_from_X methods raise exceptions on failure
-        print("\n2. Testing _retrieve_from_X methods raise exceptions on failure:")
-        
-        retrieve_methods = [
-            ('_retrieve_from_redis', MemorySystem.REDIS),
-            ('_retrieve_from_neo4j', MemorySystem.NEO4J),
-            ('_retrieve_from_basic_memory', MemorySystem.BASIC_MEMORY)
-        ]
-        
-        for method_name, system in retrieve_methods:
-            try:
-                method = getattr(selector, method_name)
-                method({"test": "query"}, TaskType.UNKNOWN)
-                print(f"  ✗ {method_name} did not raise exception")
-                return False
-            except Exception as e:
-                print(f"  ✓ {method_name} properly raises exception: {type(e).__name__}")
+        # Requirements 1 & 2: _store_in_X and _retrieve_from_X methods are now tested 
+        # individually using pytest.mark.parametrize for better granularity
+        print("\n1. & 2. Store and retrieve methods exception testing moved to parametrized tests")
+        print("  ✓ See test_store_methods_raise_exceptions and test_retrieve_methods_raise_exceptions")
         
         # Requirement 3: Test that exceptions trigger execute_with_fallback
         print("\n3. Testing exceptions trigger execute_with_fallback:")
@@ -159,8 +189,8 @@ def test_requirement_3_5():
         
         print("\n" + "=" * 70)
         print("ALL REQUIREMENTS FROM SECTION 3.5 SUCCESSFULLY IMPLEMENTED!")
-        print("✓ _store_in_X methods raise exceptions on failure")
-        print("✓ _retrieve_from_X methods raise exceptions on failure") 
+        print("✓ _store_in_X methods raise exceptions on failure (tested via pytest parametrization)")
+        print("✓ _retrieve_from_X methods raise exceptions on failure (tested via pytest parametrization)") 
         print("✓ Exceptions trigger execute_with_fallback")
         print("✓ API errors logged via CABTracker with proper severity, context, and metrics")
         print("✓ Integration with high-level store_data and retrieve_data methods")
