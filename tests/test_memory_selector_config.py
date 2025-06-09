@@ -160,9 +160,9 @@ class TestMemorySelectorConfig(unittest.TestCase):
                 
                 # Should have logged warning for malformed line
                 mock_logger.warning.assert_called()
-                warning_calls = [call for call in mock_logger.warning.call_args_list 
-                               if 'INVALID_LINE_NO_EQUALS' in str(call) and 'Malformed line' in str(call)]
-                self.assertTrue(len(warning_calls) > 0, "Expected warning to be logged for malformed line 'INVALID_LINE_NO_EQUALS'")
+                
+                # Use assert_any_call with a custom matcher for more specific assertion
+                mock_logger.warning.assert_any_call(ContainsMalformedLineWarning())
                 
         finally:
             os.unlink(temp_file.name)
