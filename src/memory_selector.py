@@ -11,7 +11,6 @@ import sys
 from typing import Dict, List, Optional, Any, Tuple, NamedTuple
 from enum import Enum
 import requests
-import json
 
 
 class ConnectivityError(Exception):
@@ -173,8 +172,15 @@ class Neo4jMCPClient:
             self.send_memory_request("health_check")
             self.send_cypher_request("health_check")
             return True
-        except:
+        except requests.exceptions.RequestException as e:
+            logger.error("Health check failed due to a RequestException: %s", e, exc_info=True)
             return False
+        except (ValueError, TypeError) as e:
+            logger.error("Health check failed due to a known exception: %s", e, exc_info=True)
+            return False
+        except Exception as e:
+            logger.critical("Health check failed due to an unexpected exception: %s", e, exc_info=True)
+            raise
 
 
 class BasicMemoryClient:
@@ -304,7 +310,11 @@ class BasicMemoryClient:
             url = f"{self.base_url}/health"
             response = self.session.get(url, timeout=5)
             return response.status_code == 200
-        except:
+        except requests.exceptions.RequestException as e:
+            logger.error("Health check failed due to a request exception.", exc_info=True)
+            return False
+        except ValueError as e:
+            logger.error("An error occurred during the health check.", exc_info=True)
             return False
 
 
