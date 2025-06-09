@@ -8,7 +8,6 @@ memory systems based on request analysis.
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.automated_memory_router import AutomatedMemoryRouter, MemoryRequest
 from src.cab_tracker import CABTracker
