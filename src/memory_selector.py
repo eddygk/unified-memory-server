@@ -1086,8 +1086,8 @@ class MemorySelector:
         Targets mcp-neo4j-memory for entity/relation operations or mcp-neo4j-cypher for raw queries.
         Constructs appropriate MCP JSON payloads and handles responses and errors.
         """
-        client = self._get_neo4j_client()
-        if not client:
+        # Check that the Neo4j MCP client is available
+        if not self._get_neo4j_client():
             if self.cab_tracker:
                 self.cab_tracker.log_suggestion(
                     "Missing Implementation", 
@@ -1096,6 +1096,9 @@ class MemorySelector:
                     context=f"Task: {task}"
                 )
             raise Exception("Neo4j MCP client not available")
+        
+        # Assign the client to a variable for use
+        client = self._neo4j_client
         
         try:
             logger.info(f"Storing data in Neo4j via MCP for task: {task}")
@@ -1312,8 +1315,8 @@ class MemorySelector:
         Targets mcp-neo4j-memory for entity/relation operations or mcp-neo4j-cypher for raw queries.
         Constructs appropriate MCP JSON payloads and handles responses and errors.
         """
-        client = self._get_neo4j_client()
-        if not client:
+        # Check that the Neo4j MCP client is available
+        if not self._get_neo4j_client():
             if self.cab_tracker:
                 self.cab_tracker.log_suggestion(
                     "Missing Implementation",
@@ -1322,6 +1325,9 @@ class MemorySelector:
                     context=f"Task: {task}"
                 )
             raise Exception("Neo4j MCP client not available")
+        
+        # Assign the client to a variable for use
+        client = self._neo4j_client
         
         try:
             logger.info(f"Retrieving data from Neo4j via MCP for task: {task}")
