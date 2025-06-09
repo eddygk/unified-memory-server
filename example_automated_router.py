@@ -158,7 +158,7 @@ def demo_entity_extraction():
     for content in test_content:
         print(f"Content: \"{content}\"")
         
-        request = MemoryRequest(operation="analyze", content=content)
+        request = MemoryRequest(operation="store", content=content)
         entities = router.entity_extractor.extract(request)
         
         if entities:

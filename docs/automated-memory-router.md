@@ -18,6 +18,7 @@ Classifies requests into intent categories:
 - **Documentation Operations**: WRITE_DOC, READ_DOC, UPDATE_DOC  
 - **Search Operations**: SEMANTIC_SEARCH, CONTEXT_RETRIEVAL, MEMORY_LOOKUP
 - **Multi-System Operations**: SYNC_DATA, CROSS_REFERENCE, COMPREHENSIVE_STORE
+- **General**: UNKNOWN
 
 ### 2. EntityExtractor
 Identifies entities in requests:
