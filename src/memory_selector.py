@@ -11,7 +11,6 @@ import sys
 from typing import Dict, List, Optional, Any, Tuple, NamedTuple
 from enum import Enum
 import requests
-import json
 
 
 class ConnectivityError(Exception):
@@ -173,7 +172,9 @@ class Neo4jMCPClient:
             self.send_memory_request("health_check")
             self.send_cypher_request("health_check")
             return True
-        except:
+        except requests.exceptions.RequestException:
+            return False
+        except Exception:
             return False
 
 
@@ -304,7 +305,9 @@ class BasicMemoryClient:
             url = f"{self.base_url}/health"
             response = self.session.get(url, timeout=5)
             return response.status_code == 200
-        except:
+        except requests.exceptions.RequestException:
+            return False
+        except Exception:
             return False
 
 
