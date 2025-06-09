@@ -1539,6 +1539,211 @@ class MemorySelector:
         """Get the fallback chain for a given memory system"""
         return self._fallback_chains.get(system, [])
 
+    def propagate_data(self, data: Dict[str, Any], source_system: MemorySystem, data_type: str, entity_id: Optional[str] = None, task: str = "data_propagation", context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Propagate data from source system to relevant destination systems.
+        
+        Implements logic to call _store_in_X for relevant systems when data needs to be synced.
+        Logs inconsistencies via CABTracker as per Section 3.4 of implementation plan.
+        
+        Args:
+            data: Data to propagate
+            source_system: System where data originated
+            data_type: Type of data being propagated (e.g., "user_profile", "relationship")
+            entity_id: Optional entity identifier for tracking
+            task: Task context for propagation operation
+            context: Optional context for the propagation
+            
+        Returns:
+            Dictionary containing propagation results for each target system
+        """
+        logger.info(f"Propagating '{data_type}' from {source_system.value} for entity '{entity_id}'")
+        
+        propagation_results = {}
+        inconsistencies_detected = []
+        
+        # Determine which systems should receive this data type
+        target_systems = self._get_propagation_targets(source_system, data_type)
+        
+        if self.cab_tracker:
+            self.cab_tracker.log_suggestion(
+                "Data Propagation Started",
+                f"Propagating {data_type} from {source_system.value} to {len(target_systems)} systems",
+                severity='LOW',
+                context=f"Entity: {entity_id}, Targets: {[s.value for s in target_systems]}",
+                metrics={"source_system": source_system.value, "target_count": len(target_systems)}
+            )
+        
+        for target_system in target_systems:
+            try:
+                # Use the specific propagation method for each system
+                if target_system == MemorySystem.REDIS:
+                    result = self._propagate_to_redis(data, data_type, entity_id, task, context)
+                elif target_system == MemorySystem.NEO4J:
+                    result = self._propagate_to_neo4j(data, data_type, entity_id, task, context)
+                elif target_system == MemorySystem.BASIC_MEMORY:
+                    result = self._propagate_to_basic_memory(data, data_type, entity_id, task, context)
+                else:
+                    logger.warning(f"Unknown target system for propagation: {target_system.value}")
+                    continue
+                
+                propagation_results[target_system.value] = {"status": "success", "result": result}
+                logger.info(f"Successfully propagated to {target_system.value}")
+                
+            except Exception as e:
+                error_msg = f"Failed to propagate to {target_system.value}: {str(e)}"
+                logger.error(error_msg)
+                propagation_results[target_system.value] = {"status": "error", "error": str(e)}
+                
+                if self.cab_tracker:
+                    self.cab_tracker.log_suggestion(
+                        "Propagation Error",
+                        f"Failed to propagate {data_type} from {source_system.value} to {target_system.value}",
+                        severity='HIGH',
+                        context=f"Entity: {entity_id}, Error: {str(e)}",
+                        metrics={"source_system": source_system.value, "target_system": target_system.value}
+                    )
+        
+        # Log successful propagation summary
+        successful_systems = [k for k, v in propagation_results.items() if v["status"] == "success"]
+        failed_systems = [k for k, v in propagation_results.items() if v["status"] == "error"]
+        
+        if self.cab_tracker:
+            self.cab_tracker.log_suggestion(
+                "Data Propagation Summary",
+                f"Propagation completed: {len(successful_systems)} successful, {len(failed_systems)} failed",
+                severity='LOW' if not failed_systems else 'MEDIUM',
+                context=f"Entity: {entity_id}, Data type: {data_type}",
+                metrics={
+                    "successful_systems": successful_systems,
+                    "failed_systems": failed_systems,
+                    "total_targets": len(target_systems)
+                }
+            )
+        
+        return propagation_results
+
+    def _propagate_to_redis(self, data: Dict[str, Any], data_type: str, entity_id: Optional[str], task: str, context: Optional[Dict[str, Any]]) -> Any:
+        """Propagate data to Redis system using existing _store_in_redis method"""
+        logger.info(f"Propagating {data_type} to Redis for entity {entity_id}")
+        
+        # Enhance data with propagation metadata
+        propagation_data = {
+            **data,
+            "_propagation_metadata": {
+                "entity_id": entity_id,
+                "data_type": data_type,
+                "propagated_at": data.get("timestamp"),
+                "propagation_task": task
+            }
+        }
+        
+        return self._store_in_redis(propagation_data, task, context)
+
+    def _propagate_to_neo4j(self, data: Dict[str, Any], data_type: str, entity_id: Optional[str], task: str, context: Optional[Dict[str, Any]]) -> Any:
+        """Propagate data to Neo4j system using existing _store_in_neo4j method"""
+        logger.info(f"Propagating {data_type} to Neo4j for entity {entity_id}")
+        
+        # Enhance data with propagation metadata for Neo4j
+        propagation_data = {
+            **data,
+            "_propagation_metadata": {
+                "entity_id": entity_id,
+                "data_type": data_type,
+                "propagated_at": data.get("timestamp"),
+                "propagation_task": task
+            }
+        }
+        
+        # If this is relationship data, ensure proper Neo4j structure
+        if data_type == "relationship" and "relations" not in propagation_data:
+            if "source" in data and "target" in data:
+                propagation_data["relations"] = [{
+                    "source": data["source"],
+                    "target": data["target"],
+                    "relation_type": data.get("relation_type", "RELATED_TO"),
+                    "properties": data.get("properties", {})
+                }]
+        
+        return self._store_in_neo4j(propagation_data, task, context)
+
+    def _propagate_to_basic_memory(self, data: Dict[str, Any], data_type: str, entity_id: Optional[str], task: str, context: Optional[Dict[str, Any]]) -> Any:
+        """Propagate data to Basic Memory system using existing _store_in_basic_memory method"""
+        logger.info(f"Propagating {data_type} to Basic Memory for entity {entity_id}")
+        
+        # Enhance data with propagation metadata
+        propagation_data = {
+            **data,
+            "_propagation_metadata": {
+                "entity_id": entity_id,
+                "data_type": data_type,
+                "propagated_at": data.get("timestamp"),
+                "propagation_task": task
+            }
+        }
+        
+        # Ensure content is properly formatted for Basic Memory
+        if "content" not in propagation_data:
+            propagation_data["content"] = str(data)
+        
+        if "title" not in propagation_data:
+            propagation_data["title"] = f"{data_type.title()} - {entity_id or 'Unknown Entity'}"
+        
+        return self._store_in_basic_memory(propagation_data, task, context)
+
+    def _get_propagation_targets(self, source_system: MemorySystem, data_type: str) -> List[MemorySystem]:
+        """
+        Determine which systems should receive propagated data based on data type and source system.
+        
+        Args:
+            source_system: System where data originated
+            data_type: Type of data being propagated
+            
+        Returns:
+            List of target systems for propagation
+        """
+        # Define propagation rules based on data type
+        propagation_rules = {
+            "user_profile": [MemorySystem.REDIS, MemorySystem.NEO4J, MemorySystem.BASIC_MEMORY],
+            "user_identity": [MemorySystem.NEO4J, MemorySystem.REDIS],
+            "relationship": [MemorySystem.NEO4J, MemorySystem.REDIS],
+            "conversation": [MemorySystem.REDIS],
+            "conversation_context": [MemorySystem.REDIS],
+            "documentation": [MemorySystem.BASIC_MEMORY, MemorySystem.REDIS],
+            "structured_note": [MemorySystem.BASIC_MEMORY],
+            "persistent_knowledge": [MemorySystem.BASIC_MEMORY, MemorySystem.NEO4J],
+            "entity_connection": [MemorySystem.NEO4J, MemorySystem.REDIS],
+            "semantic_search": [MemorySystem.REDIS],
+            "preference_storage": [MemorySystem.REDIS],
+            "session_data": [MemorySystem.REDIS],
+        }
+        
+        # Get target systems for this data type, excluding the source system
+        all_targets = propagation_rules.get(data_type, [])
+        target_systems = [system for system in all_targets if system != source_system]
+        
+        # Filter based on system availability
+        available_targets = []
+        for system in target_systems:
+            if system == MemorySystem.REDIS and self.config.get('REDIS_URL'):
+                available_targets.append(system)
+            elif system == MemorySystem.NEO4J and self.config.get('NEO4J_ENABLED'):
+                available_targets.append(system)
+            elif system == MemorySystem.BASIC_MEMORY and self.config.get('BASIC_MEMORY_ENABLED'):
+                available_targets.append(system)
+        
+        if self.cab_tracker and len(available_targets) != len(target_systems):
+            unavailable_systems = [s.value for s in target_systems if s not in available_targets]
+            self.cab_tracker.log_suggestion(
+                "Propagation Target Unavailable",
+                f"Some propagation targets unavailable for {data_type}",
+                severity='MEDIUM',
+                context=f"Unavailable systems: {unavailable_systems}",
+                metrics={"data_type": data_type, "unavailable_systems": unavailable_systems}
+            )
+        
+        return available_targets
+
 
 class MemoryPropagator:
     """Handles cross-system data propagation"""
