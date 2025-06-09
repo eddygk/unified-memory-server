@@ -529,7 +529,7 @@ class MemorySelector:
         analysis = self.get_task_analysis(task, context)
         
         # If confidence is low, fall back to legacy keyword matching
-        if analysis.confidence < 0.3:
+        if analysis.confidence < FALLBACK_THRESHOLD:
             if self.cab_tracker:
                 self.cab_tracker.log_suggestion(
                     "Low Confidence Analysis", 
