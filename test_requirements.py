@@ -37,6 +37,7 @@ def test_requirement_3_5():
             ('_store_in_basic_memory', MemorySystem.BASIC_MEMORY)
         ]
         
+        test_failed = False
         for method_name, system in store_methods:
             try:
                 method = getattr(selector, method_name)
@@ -45,6 +46,9 @@ def test_requirement_3_5():
                 test_failed = True
             except Exception as e:
                 print(f"  ✓ {method_name} properly raises exception: {type(e).__name__}")
+        
+        if test_failed:
+            return False
         
         # Requirement 2: Ensure _retrieve_from_X methods raise exceptions on failure
         print("\n2. Testing _retrieve_from_X methods raise exceptions on failure:")
