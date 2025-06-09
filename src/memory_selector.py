@@ -3,12 +3,13 @@ Memory System Selector
 Implements intelligent routing to appropriate memory systems based on task type
 """
 import logging
+
+logger = logging.getLogger(__name__)
+
 import os
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 import time
-
-logger = logging.getLogger(__name__)
 
 
 class MemorySystem(Enum):
