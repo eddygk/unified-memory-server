@@ -7,6 +7,7 @@ Implements intelligent routing to appropriate memory systems based on task type
 import logging
 import os
 import re
+import sys
 from typing import Dict, List, Optional, Any, Tuple, NamedTuple
 from enum import Enum
 import requests
@@ -73,7 +74,7 @@ class TaskAnalysis(NamedTuple):
 class Neo4jMCPClient:
     """Client for interacting with Neo4j MCP servers (mcp-neo4j-memory and mcp-neo4j-cypher)"""
     
-    def __init__(self, memory_server_url: str, cypher_server_url: str, timeout: int = 30):
+    def __init__(self, memory_server_url: str, cypher_server_url: str, timeout: int = 30, test_mode: bool = False):
         """
         Initialize Neo4j MCP client
         
@@ -81,10 +82,12 @@ class Neo4jMCPClient:
             memory_server_url: URL for the mcp-neo4j-memory server
             cypher_server_url: URL for the mcp-neo4j-cypher server
             timeout: Request timeout in seconds
+            test_mode: If True, avoid actual network calls (for testing/development)
         """
         self.memory_server_url = memory_server_url.rstrip('/')
         self.cypher_server_url = cypher_server_url.rstrip('/')
         self.timeout = timeout
+        self.test_mode = test_mode
         self.session = requests.Session()
         
         # Set common headers for MCP requests
@@ -103,6 +106,24 @@ class Neo4jMCPClient:
     
     def _send_mcp_request(self, url: str, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """Send MCP request to specified server"""
+        # In test mode, check if the server is reachable before making the request
+        if self.test_mode:
+            # Check if the URL uses internal hostnames that might not resolve
+            from urllib.parse import urlparse
+            parsed_url = urlparse(url)
+            hostname = parsed_url.hostname
+            
+            # Check if the hostname is in the list of internal Docker hostnames
+            if hostname in INTERNAL_HOSTNAMES:
+                # Try a quick connectivity check first
+                try:
+                    import socket
+                    socket.gethostbyname(hostname)
+                except (socket.gaierror, socket.error):
+                    # Hostname doesn't resolve, raise a descriptive exception instead of trying the network call
+                    logger.warning(f"Test mode: Skipping network call to unreachable hostname '{hostname}'")
+                    raise ConnectivityError(f"Test mode: Neo4j MCP server at {hostname} is not reachable (expected in development/CI environment)")
+        
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -153,7 +174,7 @@ class Neo4jMCPClient:
 class BasicMemoryClient:
     """Client for interacting with basicmachines-co/basic-memory REST API"""
     
-    def __init__(self, base_url: str, auth_token: Optional[str] = None, timeout: int = 30):
+    def __init__(self, base_url: str, auth_token: Optional[str] = None, timeout: int = 30, test_mode: bool = False):
         """
         Initialize Basic Memory client
         
@@ -161,9 +182,11 @@ class BasicMemoryClient:
             base_url: Base URL for the Basic Memory API
             auth_token: Optional authentication token
             timeout: Request timeout in seconds
+            test_mode: If True, avoid actual network calls (for testing/development)
         """
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
+        self.test_mode = test_mode
         self.session = requests.Session()
         
         # Set up authentication if provided
@@ -176,8 +199,40 @@ class BasicMemoryClient:
             'Accept': 'application/json'
         })
     
+    def _check_connectivity_or_skip(self, operation_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Check connectivity in test mode, raise exception if server is unreachable.
+        
+        Returns:
+            None if server is reachable or test mode is disabled
+            
+        Raises:
+            Exception if server is unreachable in test mode
+        """
+        if not self.test_mode:
+            return None
+            
+        from urllib.parse import urlparse
+        parsed_url = urlparse(self.base_url)
+        hostname = parsed_url.hostname
+        
+        # Common internal Docker hostnames that won't resolve in development
+        internal_hostnames = ['basic-memory', 'neo4j', 'redis']
+        
+        if hostname in internal_hostnames:
+            try:
+                import socket
+                socket.gethostbyname(hostname)
+            except (socket.gaierror, socket.error):
+                logger.warning(f"Test mode: Skipping {operation_name} to unreachable hostname '{hostname}'")
+                raise Exception(f"Test mode: Basic Memory server at {hostname} is not reachable (expected in development/CI environment)")
+        
+        return None
+
     def store_entity(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Store an entity in Basic Memory"""
+        self._check_connectivity_or_skip("store_entity")
+            
         url = f"{self.base_url}/entities"
         response = self.session.post(url, json=data, timeout=self.timeout)
         response.raise_for_status()
@@ -185,6 +240,8 @@ class BasicMemoryClient:
     
     def search_entities(self, query: str, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Search for entities in Basic Memory"""
+        self._check_connectivity_or_skip("search_entities")
+            
         url = f"{self.base_url}/search"
         payload = {'query': query}
         if filters:
@@ -196,6 +253,8 @@ class BasicMemoryClient:
     
     def get_entity(self, entity_id: str) -> Dict[str, Any]:
         """Retrieve a specific entity by ID"""
+        self._check_connectivity_or_skip("get_entity")
+            
         url = f"{self.base_url}/entities/{entity_id}"
         response = self.session.get(url, timeout=self.timeout)
         response.raise_for_status()
@@ -203,6 +262,8 @@ class BasicMemoryClient:
     
     def update_entity(self, entity_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update an existing entity"""
+        self._check_connectivity_or_skip("update_entity")
+            
         url = f"{self.base_url}/entities/{entity_id}"
         response = self.session.put(url, json=data, timeout=self.timeout)
         response.raise_for_status()
@@ -210,12 +271,16 @@ class BasicMemoryClient:
     
     def delete_entity(self, entity_id: str) -> None:
         """Delete an entity by ID"""
+        self._check_connectivity_or_skip("delete_entity")
+            
         url = f"{self.base_url}/entities/{entity_id}"
         response = self.session.delete(url, timeout=self.timeout)
         response.raise_for_status()
     
     def get_tree(self) -> Dict[str, Any]:
         """Get the tree structure of entities"""
+        self._check_connectivity_or_skip("get_tree")
+            
         url = f"{self.base_url}/tree"
         response = self.session.get(url, timeout=self.timeout)
         response.raise_for_status()
@@ -223,6 +288,12 @@ class BasicMemoryClient:
     
     def health_check(self) -> bool:
         """Check if the Basic Memory service is healthy"""
+        if self.test_mode:
+            try:
+                self._check_connectivity_or_skip("health_check")
+            except Exception:
+                return False  # Unreachable in test mode
+        
         try:
             url = f"{self.base_url}/health"
             response = self.session.get(url, timeout=5)
@@ -458,6 +529,9 @@ class MemorySelector:
         
         # Initialize intent analyzer for enhanced task determination
         self._intent_analyzer = IntentAnalyzer()
+        
+        # Detect if we're in a test/development environment
+        self._test_mode = self._detect_test_environment()
 
     def _load_config(self, config_path: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -486,6 +560,49 @@ class MemorySelector:
             config_files.append(config_path)
         config_files.extend(['.env', '.env.production', '.env.local'])
         return config_files
+
+    def _detect_test_environment(self) -> bool:
+        """
+        Detect if we're running in a test/development environment where external services may not be available.
+        
+        Returns:
+            True if we're in a test/development environment, False otherwise
+        """
+        # Check for common CI/testing environment indicators
+        ci_indicators = [
+            'CI', 'GITHUB_ACTIONS', 'JENKINS_URL', 'TRAVIS', 'CIRCLE_CI', 'GITLAB_CI',
+            'BUILDKITE', 'AZURE_PIPELINES', 'TF_BUILD'
+        ]
+        
+        # Check for testing frameworks
+        test_indicators = [
+            'PYTEST_CURRENT_TEST', 'UNITTEST_CURRENT_TEST', '_PYTEST_CAPTURE_OPTION'
+        ]
+        
+        # Check for development mode indicators
+        dev_indicators = [
+            'DEBUG', 'DEVELOPMENT', 'DEV_MODE'
+        ]
+        
+        # Check if any CI/test/dev indicators are present
+        for indicator in ci_indicators + test_indicators + dev_indicators:
+            if os.getenv(indicator):
+                logger.info(f"Test environment detected via {indicator} environment variable")
+                return True
+        
+        # Check if we're running tests by looking at sys.modules
+        test_modules = ['pytest', 'unittest', 'nose', 'nose2']
+        for module in test_modules:
+            if module in sys.modules:
+                logger.info(f"Test environment detected via {module} module")
+                return True
+        
+        # Check if the TEST_MODE environment variable is explicitly set
+        if os.getenv('TEST_MODE', 'false').lower() == 'true':
+            logger.info("Test environment detected via TEST_MODE environment variable")
+            return True
+        
+        return False
 
     def _parse_config_files(self, config_files: List[str]) -> Dict[str, Any]:
         """Parse configuration files and merge their contents."""
@@ -558,6 +675,9 @@ class MemorySelector:
             # AI Service Keys
             'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY'),
             'ANTHROPIC_API_KEY': os.getenv('ANTHROPIC_API_KEY'),
+            
+            # Test Mode
+            'TEST_MODE': os.getenv('TEST_MODE', 'false').lower() == 'true',
         })
 
         return config
@@ -692,7 +812,8 @@ class MemorySelector:
                     },
                     create_client=lambda: BasicMemoryClient(
                         base_url=base_url,
-                        auth_token=self.config.get('BASIC_MEMORY_AUTH_TOKEN')
+                        auth_token=self.config.get('BASIC_MEMORY_AUTH_TOKEN'),
+                        test_mode=self._test_mode
                     )
                 )
             else:
@@ -733,7 +854,8 @@ class MemorySelector:
                 },
                 create_client=lambda: Neo4jMCPClient(
                     memory_server_url=memory_url,
-                    cypher_server_url=cypher_url
+                    cypher_server_url=cypher_url,
+                    test_mode=self._test_mode
                 )
             )
         return self._neo4j_client
