@@ -41,9 +41,8 @@ class TestClientVariableUsage(unittest.TestCase):
             try:
                 # This should not raise NameError for undefined 'client'
                 self.selector._store_in_redis({"test": "data"}, "test task")
-            except Exception as e:
-                # Should not be a NameError about undefined 'client'
-                self.assertNotIsInstance(e, NameError)
+            except NameError as e:
+                # Ensure the exception is specifically about the 'client' variable
                 if "client" in str(e).lower() and "not defined" in str(e).lower():
                     self.fail(f"Client variable not defined: {e}")
 
