@@ -13,6 +13,9 @@ from enum import Enum
 # Initialize logger for the module
 logger = logging.getLogger(__name__)
 
+# Configuration constants
+FALLBACK_THRESHOLD = 0.3  # Confidence threshold below which fallback to legacy analysis is used
+
 
 class MemorySystem(Enum):
     """Available memory systems"""
@@ -525,7 +528,13 @@ class MemorySelector:
         return self._neo4j_client
 
     def get_task_analysis(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskAnalysis:
-        """Get detailed analysis of task using enhanced intent recognition"""
+        """Get detailed analysis of task using enhanced intent recognition
+        
+        Returns TaskAnalysis containing task_type, operation_type, entities, confidence, 
+        reasoning, and patterns_matched. The patterns_matched field contains a list of
+        pattern descriptions that were matched during the analysis to aid in debugging
+        and understanding the classification decision.
+        """
         return self._intent_analyzer.analyze_intent(task, context)
     
     def analyze_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskType:
