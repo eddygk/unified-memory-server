@@ -48,7 +48,6 @@ def test_requirement_3_5():
                 print(f"  ✓ {method_name} properly raises exception: {type(e).__name__}")
         
         assert not test_failed, "Some _store_in_X methods did not raise exceptions as expected"
-        
         # Requirement 2: Ensure _retrieve_from_X methods raise exceptions on failure
         print("\n2. Testing _retrieve_from_X methods raise exceptions on failure:")
         
