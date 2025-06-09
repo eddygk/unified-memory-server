@@ -55,7 +55,7 @@ class Entity:
 @dataclass
 class MemoryRequest:
     """Represents a memory operation request"""
-    operation: str  # store, retrieve, search, etc.
+    operation: str  # store, query, retrieve, search
     content: str
     context: Optional[Dict[str, Any]] = None
     entities: List[Entity] = field(default_factory=list)
