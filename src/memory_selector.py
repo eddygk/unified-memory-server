@@ -1182,7 +1182,7 @@ class MemorySelector:
                         cypher = f"""
                         MATCH (source {{name: $source_name}})
                         MATCH (target {{name: $target_name}})
-                        CREATE (source)-[r:{relation.get('relationType', 'RELATED_TO')}]->(target)
+                        CREATE (source)-[r:{relation.get('relation_type', 'RELATED_TO')}]->(target)
                         SET r += $properties
                         RETURN r
                         """
