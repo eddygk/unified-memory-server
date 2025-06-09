@@ -162,14 +162,6 @@ class TestMemorySelectorConfig(unittest.TestCase):
                 mock_logger.warning.assert_called()
                 
                 # Use assert_any_call with a custom matcher for more specific assertion
-                class ContainsMalformedLineWarning:
-                    def __eq__(self, other):
-                        return ('INVALID_LINE_NO_EQUALS' in str(other) and 
-                                'Malformed line' in str(other) and 
-                                'Expected KEY=VALUE format' in str(other))
-                    def __repr__(self):
-                        return '<ContainsMalformedLineWarning>'
-                
                 mock_logger.warning.assert_any_call(ContainsMalformedLineWarning())
                 
         finally:
