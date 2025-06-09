@@ -238,7 +238,7 @@ class BasicMemoryClient:
                 socket.gethostbyname(hostname)
             except (socket.gaierror, socket.error):
                 logger.warning(f"Test mode: Skipping {operation_name} to unreachable hostname '{hostname}'")
-                raise Exception(f"Test mode: Basic Memory server at {hostname} is not reachable (expected in development/CI environment)")
+                raise ConnectivityError(f"Test mode: Basic Memory server at {hostname} is not reachable (expected in development/CI environment)")
         
         return None
 

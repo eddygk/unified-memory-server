@@ -273,7 +273,7 @@ class TestBasicMemoryClientTestMode(unittest.TestCase):
             test_mode=True
         )
         
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(ConnectivityError) as context:
             client._check_connectivity_or_skip("test_operation")
         
         self.assertIn("Basic Memory server at basic-memory is not reachable", str(context.exception))
