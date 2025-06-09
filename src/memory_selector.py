@@ -307,7 +307,8 @@ class BasicMemoryClient:
             url = f"{self.base_url}/health"
             response = self.session.get(url, timeout=5)
             return response.status_code == 200
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            logger.error("Health check failed due to a request exception.", exc_info=True)
             return False
         except Exception:
             return False
