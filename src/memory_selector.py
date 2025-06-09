@@ -175,9 +175,12 @@ class Neo4jMCPClient:
         except requests.exceptions.RequestException as e:
             logger.error("Health check failed due to a RequestException: %s", e, exc_info=True)
             return False
-        except Exception as e:
-            logger.error("Health check failed due to an unexpected exception: %s", e, exc_info=True)
+        except (ValueError, TypeError) as e:
+            logger.error("Health check failed due to a known exception: %s", e, exc_info=True)
             return False
+        except Exception as e:
+            logger.critical("Health check failed due to an unexpected exception: %s", e, exc_info=True)
+            raise
 
 
 class BasicMemoryClient:
