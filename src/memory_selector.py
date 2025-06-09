@@ -313,7 +313,7 @@ class BasicMemoryClient:
         except requests.exceptions.RequestException as e:
             logger.error("Health check failed due to a request exception.", exc_info=True)
             return False
-        except (requests.exceptions.RequestException, ValueError) as e:
+        except ValueError as e:
             logger.error("An error occurred during the health check.", exc_info=True)
             return False
 
