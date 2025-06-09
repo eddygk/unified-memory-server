@@ -1642,6 +1642,18 @@ class MemorySelector:
         
         return propagation_results
 
+    def _enrich_with_propagation_metadata(self, data: Dict[str, Any], data_type: str, entity_id: Optional[str], task: str) -> Dict[str, Any]:
+        """Enrich data with propagation metadata for cross-system synchronization"""
+        return {
+            **data,
+            "_propagation_metadata": {
+                "entity_id": entity_id,
+                "data_type": data_type,
+                "propagated_at": data.get("timestamp"),
+                "propagation_task": task
+            }
+        }
+
     def _propagate_to_redis(self, data: Dict[str, Any], data_type: str, entity_id: Optional[str], task: str, context: Optional[Dict[str, Any]]) -> Any:
         """Propagate data to Redis system using existing _store_in_redis method"""
         logger.info(f"Propagating {data_type} to Redis for entity {entity_id}")
