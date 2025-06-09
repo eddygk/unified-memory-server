@@ -16,9 +16,9 @@ The router analyzes incoming requests using multiple techniques:
 Classifies requests into intent categories:
 - **Relationship Operations**: CREATE_RELATION, QUERY_RELATION, TRAVERSE_GRAPH
 - **Documentation Operations**: WRITE_DOC, READ_DOC, UPDATE_DOC  
-- **Search Operations**: SEMANTIC_SEARCH, CONTEXT_RETRIEVAL, MEMORY_LOOKUP
-- **Multi-System Operations**: SYNC_DATA, CROSS_REFERENCE, COMPREHENSIVE_STORE
-- **General**: UNKNOWN
+- **Search Operations**: SEMANTIC_SEARCH, CONTEXT_RETRIEVAL, MEMORY_LOOKUP  
+- **Multi-System Operations**: SYNC_DATA, CROSS_REFERENCE, COMPREHENSIVE_STORE  
+- **General**: UNKNOWN  
 
 ### 2. EntityExtractor
 Identifies entities in requests:
@@ -46,14 +46,14 @@ Makes final routing decisions:
 ### Basic Usage
 
 ```python
-from src.automated_memory_router import AutomatedMemoryRouter, MemoryRequest
+from src.automated_memory_router import AutomatedMemoryRouter, MemoryRequest, Operation
 
 # Initialize router
 router = AutomatedMemoryRouter()
 
 # Create a request
 request = MemoryRequest(
-    operation="store",
+    operation=Operation.STORE,
     content="Connect John Smith to the Marketing project",
     context={'operation': 'store'}
 )
