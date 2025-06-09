@@ -264,7 +264,7 @@ class IntentAnalyzer:
 class MemorySelector:
     """Selects appropriate memory system based on task characteristics"""
 
-    def __init__(self, cab_tracker=None, config_path=None, validate_config=True):
+    def __init__(self, cab_tracker=None, *, config_path=None, validate_config=True):
         """
         Initialize MemorySelector with configuration loading and validation.
 
