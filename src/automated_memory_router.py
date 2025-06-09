@@ -64,7 +64,7 @@ class Entity:
 class MemoryRequest:
     """Represents a memory operation request
     
-    Supported operations: store, query, retrieve, search
+    Supported operations: Operation.STORE, Operation.QUERY, Operation.RETRIEVE, Operation.SEARCH
     """
     operation: Operation
     content: str

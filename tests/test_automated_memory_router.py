@@ -84,7 +84,7 @@ class TestIntentAnalyzer(unittest.TestCase):
         request_store = MemoryRequest(
             operation=Operation.QUERY, 
             content=content,
-            context={'operation': 'store'}
+            context={'operation': Operation.STORE.value}
         )
         result_store = self.analyzer.analyze(request_store)
         
@@ -92,7 +92,7 @@ class TestIntentAnalyzer(unittest.TestCase):
         request_search = MemoryRequest(
             operation=Operation.QUERY,
             content=content, 
-            context={'operation': 'search'}
+            context={'operation': Operation.SEARCH.value}
         )
         result_search = self.analyzer.analyze(request_search)
         
@@ -106,12 +106,12 @@ class TestIntentAnalyzer(unittest.TestCase):
         request_ambiguous_store = MemoryRequest(
             operation=Operation.QUERY, 
             content=content_ambiguous,
-            context={'operation': 'store'}
+            context={'operation': Operation.STORE.value}
         )
         request_ambiguous_search = MemoryRequest(
             operation=Operation.QUERY,
             content=content_ambiguous, 
-            context={'operation': 'retrieve'}
+            context={'operation': Operation.RETRIEVE.value}
         )
         
         result_ambig_store = self.analyzer.analyze(request_ambiguous_store)

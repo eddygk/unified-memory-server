@@ -55,7 +55,7 @@ router = AutomatedMemoryRouter()
 request = MemoryRequest(
     operation=Operation.STORE,
     content="Connect John Smith to the Marketing project",
-    context={'operation': 'store'}
+    context={'operation': Operation.STORE.value}
 )
 
 # Get routing decision
