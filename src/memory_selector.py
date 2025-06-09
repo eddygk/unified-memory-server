@@ -172,9 +172,11 @@ class Neo4jMCPClient:
             self.send_memory_request("health_check")
             self.send_cypher_request("health_check")
             return True
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            logger.error("Health check failed due to a RequestException: %s", e, exc_info=True)
             return False
-        except Exception:
+        except Exception as e:
+            logger.error("Health check failed due to an unexpected exception: %s", e, exc_info=True)
             return False
 
 
