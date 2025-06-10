@@ -235,7 +235,7 @@ class StartupSequenceHandler:
             }
             
             # Placeholder result - in real implementation would call actual Redis search
-            return None  # No user found
+            raise NotImplementedError("The '_search_user_in_redis' method is a placeholder and must be implemented.")
             
         except Exception as e:
             logger.error(f"Error searching user in Redis: {str(e)}")
