@@ -1,3 +1,3 @@
 """
-Tests package for unified memory server
+Tests package for Unified Memory Server.
 """
