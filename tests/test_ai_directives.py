@@ -26,7 +26,7 @@ class TestMCPToolRouter(unittest.TestCase):
         """Test MCP tool name validation"""
         # Valid names
         self.assertTrue(self.router.validate_mcp_tool_name("local__neo4j-memory__create_entities"))
-        self.assertTrue(self.router.validate_mcp_tool_name("local__redis-memory-server__search_memory"))
+        self.assertTrue(self.router.validate_mcp_tool_name("local__redis-memory-server__search_long_term_memory"))
         self.assertTrue(self.router.validate_mcp_tool_name("local__basic-memory__write_note"))
         
         # Invalid names
