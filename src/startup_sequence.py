@@ -257,7 +257,7 @@ class StartupSequenceHandler:
             search_query = f"user identity {user}"
             
             # Placeholder result - in real implementation would call actual Basic Memory search
-            return None  # No user found
+            raise NotImplementedError("Basic Memory search is not yet implemented.")
             
         except Exception as e:
             logger.error(f"Error searching user in Basic Memory: {str(e)}")
