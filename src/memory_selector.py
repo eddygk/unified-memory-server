@@ -316,10 +316,10 @@ class BasicMemoryClient:
             response = self.session.get(url, timeout=5)
             return response.status_code == 200
         except requests.exceptions.RequestException as e:
-            logger.error("Health check failed due to a request exception.", exc_info=True)
+            logger.error("Health check failed due to a request exception: %s", e, exc_info=True)
             return False
         except ValueError as e:
-            logger.error("An error occurred during the health check.", exc_info=True)
+            logger.error("Health check failed due to a ValueError: %s", e, exc_info=True)
             return False
 
 
