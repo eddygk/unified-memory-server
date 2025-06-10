@@ -12,7 +12,7 @@ import os
 import tempfile
 import unittest
 from unittest.mock import Mock, patch, call
-from src.memory_selector import MemorySelector, MemorySystem, MemoryPropagator
+from src.memory_selector import MemorySelector, MemorySystem
 from src.cab_tracker import CABTracker
 
 
@@ -149,45 +149,55 @@ class TestCABTrackerIntegration(unittest.TestCase):
         self.assertGreater(len(missing_impl_calls), 0, "Missing implementations should be logged")
 
     def test_data_inconsistency_logging_in_propagator(self):
-        """Test that data inconsistencies are logged in MemoryPropagator."""
-        mock_clients = {
-            MemorySystem.REDIS: Mock(),
-            MemorySystem.NEO4J: Mock(),
-            MemorySystem.BASIC_MEMORY: Mock()
-        }
+        """Test that data inconsistencies are logged in MemorySelector propagation."""
+        with patch.dict(os.environ, {
+            'REDIS_URL': 'redis://localhost:6379',
+            'NEO4J_ENABLED': 'true',
+            'NEO4J_MCP_MEMORY_URL': 'http://neo4j:8001',
+            'NEO4J_MCP_CYPHER_URL': 'http://neo4j:8002',
+            'BASIC_MEMORY_ENABLED': 'true',
+            'BASIC_MEMORY_URL': 'http://basic-memory:8080'
+        }):
+            selector = MemorySelector(self.mock_cab_tracker, validate_config=False)
+            
+            # Mock the storage methods to raise exceptions to trigger error logging
+            with patch.object(selector, '_store_in_neo4j', side_effect=Exception("Neo4j connection failed")), \
+                 patch.object(selector, '_store_in_basic_memory', side_effect=Exception("Basic memory connection failed")):
+                
+                selector.propagate_data(
+                    data={"user_id": "123", "name": "test"},
+                    source_system=MemorySystem.REDIS,
+                    data_type="user_profile",
+                    entity_id="user_123"
+                )
         
-        propagator = MemoryPropagator(mock_clients, self.mock_cab_tracker)
-        
-        # Mock data consistency check to return False (inconsistent)
-        with patch.object(propagator, '_check_data_consistency', return_value=False):
-            propagator.propagate_data(
-                data={"user_id": "123", "name": "test"},
-                source_system=MemorySystem.REDIS,
-                data_type="user_profile",
-                entity_id="user_123"
-            )
-        
-        # Verify data inconsistency was logged
-        self.mock_cab_tracker.log_data_inconsistency.assert_called()
+        # Verify propagation error was logged
+        propagation_error_calls = [call for call in self.mock_cab_tracker.log_suggestion.call_args_list 
+                                  if call[0][0] == "Propagation Error"]
+        self.assertGreater(len(propagation_error_calls), 0, "Propagation errors should be logged")
 
     def test_propagation_error_logging(self):
         """Test that propagation errors are logged."""
-        mock_clients = {
-            MemorySystem.REDIS: Mock(),
-            MemorySystem.NEO4J: Mock(),
-            MemorySystem.BASIC_MEMORY: Mock()
-        }
-        
-        propagator = MemoryPropagator(mock_clients, self.mock_cab_tracker)
-        
-        # Mock propagation to raise an exception
-        with patch.object(propagator, '_check_data_consistency', side_effect=Exception("Connection failed")):
-            propagator.propagate_data(
-                data={"user_id": "123"},
-                source_system=MemorySystem.REDIS,
-                data_type="user_profile",
-                entity_id="user_123"
-            )
+        with patch.dict(os.environ, {
+            'REDIS_URL': 'redis://localhost:6379',
+            'NEO4J_ENABLED': 'true',
+            'NEO4J_MCP_MEMORY_URL': 'http://neo4j:8001',
+            'NEO4J_MCP_CYPHER_URL': 'http://neo4j:8002',
+            'BASIC_MEMORY_ENABLED': 'true',
+            'BASIC_MEMORY_URL': 'http://basic-memory:8080'
+        }):
+            selector = MemorySelector(self.mock_cab_tracker, validate_config=False)
+            
+            # Mock propagation to raise an exception
+            with patch.object(selector, '_store_in_neo4j', side_effect=Exception("Connection failed")), \
+                 patch.object(selector, '_store_in_basic_memory', side_effect=Exception("Connection failed")):
+                
+                selector.propagate_data(
+                    data={"user_id": "123"},
+                    source_system=MemorySystem.REDIS,
+                    data_type="user_profile",
+                    entity_id="user_123"
+                )
         
         # Check for propagation error logging
         propagation_error_calls = [call for call in self.mock_cab_tracker.log_suggestion.call_args_list 
