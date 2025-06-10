@@ -329,7 +329,7 @@ class AIDirectivesIntegration:
         # Add traditional fallback systems
         traditional_fallbacks = self.memory_selector.get_fallback_chain(traditional_system)
         for system in traditional_fallbacks:
-            system_name = f"traditional_{system.value}"
+            system_name = system.value  # Use system's name directly for consistency
             if system_name not in fallback_chain:
                 fallback_chain.append(system_name)
         
