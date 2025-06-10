@@ -13,6 +13,12 @@
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Project status infographic for the Unified Memory Server - A unified AI memory system integrating Neo4j, Basic Memory, and Redis Memory Server for multi-agent access.">
+    <meta name="author" content="Eddy Kawira & Claude AI">
+    <meta property="og:title" content="Unified Memory Server - Project Status Infographic">
+    <meta property="og:description" content="Interactive project status dashboard showing progress, architecture, and roadmap for the Unified Memory Server project.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://eddygk.github.io/unified-memory-server/">
     <title>Unified Memory Server - Project Status Infographic</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -84,8 +90,9 @@
                     <div class="relative flex justify-center items-center h-80">
                         <canvas id="progressDonutChart"></canvas>
                         <div class="absolute flex flex-col items-center justify-center text-center">
-                            <span class="text-7xl font-black text-[#004FFF]">75%</span>
+                            <span class="text-7xl font-black text-[#004FFF] progress-percentage">75%</span>
                             <span class="text-xl font-bold text-gray-700">Overall Completion</span>
+                            <span class="text-sm text-gray-500 last-updated mt-1">Last updated: Loading...</span>
                         </div>
                     </div>
                     <div class="flex flex-col justify-center">
@@ -232,14 +239,56 @@
         </main>
 
         <footer class="text-center mt-16 py-6 border-t border-gray-300">
-            <p class="text-gray-600">Infographic generated based on the `unified-memory-server` repository analysis.</p>
-            <p class="text-gray-500 text-sm">Authors: Eddy Kawira & Claude AI | June 2025</p>
+            <p class="text-gray-600">Infographic generated based on the <a href="https://github.com/eddygk/unified-memory-server" class="text-[#004FFF] hover:text-[#00A4FF] underline">unified-memory-server</a> repository analysis.</p>
+            <p class="text-gray-500 text-sm">Authors: Eddy Kawira & Claude AI | January 2025</p>
+            <p class="text-green-600 text-sm font-medium mt-2">🔄 Progress data automatically updated on each deployment</p>
         </footer>
 
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Load dynamic progress data
+            fetch('./progress-data.json')
+                .then(response => response.json())
+                .then(progressData => {
+                    console.log('📊 Loading dynamic progress data...', progressData);
+                    initializeCharts(progressData);
+                    updateProgressIndicators(progressData);
+                })
+                .catch(error => {
+                    console.warn('⚠️ Could not load progress data, using fallback values:', error);
+                    // Fallback to static data if dynamic data is not available
+                    const fallbackData = {
+                        overall_progress: 75,
+                        components: {
+                            "Core System": 90,
+                            "Automated Routing": 60,
+                            "Testing Framework": 70,
+                            "Documentation": 80,
+                            "Integration Layer": 65,
+                            "Security & Auth": 75
+                        }
+                    };
+                    initializeCharts(fallbackData);
+                });
+
+            function updateProgressIndicators(data) {
+                // Update the progress percentage text if it exists
+                const progressText = document.querySelector('.progress-percentage');
+                if (progressText) {
+                    progressText.textContent = `${data.overall_progress}%`;
+                }
+                
+                // Update last updated timestamp if it exists
+                const lastUpdated = document.querySelector('.last-updated');
+                if (lastUpdated && data.summary?.last_updated) {
+                    const date = new Date(data.summary.last_updated);
+                    lastUpdated.textContent = `Last updated: ${date.toLocaleDateString()}`;
+                }
+            }
+
+            function initializeCharts(progressData) {
 
             const energeticPlayfulPalette = {
                 blue: '#004FFF',
@@ -313,13 +362,16 @@
 
             const progressCtx = document.getElementById('progressDonutChart');
             if(progressCtx) {
+                const progressPercent = progressData.overall_progress || 75;
+                const remainingPercent = 100 - progressPercent;
+                
                 new Chart(progressCtx, {
                     type: 'doughnut',
                     data: {
                         labels: ['Completed', 'Remaining'],
                         datasets: [{
                             label: 'Project Progress',
-                            data: [75, 25],
+                            data: [progressPercent, remainingPercent],
                             backgroundColor: [
                                 energeticPlayfulPalette.blue,
                                 energeticPlayfulPalette.lightGray
@@ -357,19 +409,32 @@
 
             const componentCtx = document.getElementById('componentBarChart');
             if(componentCtx) {
-                const originalLabels = ['Core Functionality', 'Automated Routing', 'Testing', 'Documentation'];
+                // Extract component data from progressData
+                const components = progressData.components || {
+                    "Core System": 90,
+                    "Automated Routing": 60,
+                    "Testing Framework": 70,
+                    "Documentation": 80
+                };
+                
+                const labels = Object.keys(components);
+                const data = Object.values(components);
+                
+                const originalLabels = labels;
                 new Chart(componentCtx, {
                     type: 'bar',
                     data: {
                         labels: processLongLabels(originalLabels),
                         datasets: [{
                             label: 'Component Maturity (%)',
-                            data: [90, 60, 70, 80],
+                            data: data,
                             backgroundColor: [
                                 energeticPlayfulPalette.blue,
                                 energeticPlayfulPalette.orange,
                                 energeticPlayfulPalette.yellow,
-                                energeticPlayfulPalette.lightBlue
+                                energeticPlayfulPalette.lightBlue,
+                                energeticPlayfulPalette.blue,
+                                energeticPlayfulPalette.orange
                             ],
                             borderRadius: 6
                         }]
@@ -407,6 +472,7 @@
                     }
                 });
             }
+            } // Close initializeCharts function
         });
 
     </script>
