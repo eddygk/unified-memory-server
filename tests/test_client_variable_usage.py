@@ -37,7 +37,12 @@ class TestClientVariableUsage(unittest.TestCase):
         """Test that Redis client variable is properly defined before use"""
         # Mock the _get_redis_client method to return a mock client
         mock_client = MagicMock()
-        with patch.object(self.selector, '_get_redis_client', return_value=mock_client):
+        # Also mock the config to include Redis URL
+        test_config = self.selector.config.copy()
+        test_config['REDIS_URL'] = 'redis://localhost:6379'
+        
+        with patch.object(self.selector, '_get_redis_client', return_value=mock_client), \
+             patch.object(self.selector, 'config', test_config):
             try:
                 # This should not raise NameError for undefined 'client'
                 self.selector._store_in_redis({"test": "data"}, "test task")
