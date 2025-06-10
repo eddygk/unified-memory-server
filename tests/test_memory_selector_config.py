@@ -7,6 +7,19 @@ import unittest
 from unittest.mock import patch, MagicMock
 import sys
 
+
+class ContainsMalformedLineWarning:
+    """Custom matcher for asserting warning messages about malformed lines"""
+    
+    def __eq__(self, other):
+        """Check if the message contains 'Malformed line' text"""
+        if isinstance(other, str):
+            return 'Malformed line' in other
+        return False
+    
+    def __repr__(self):
+        return "ContainsMalformedLineWarning()"
+
 # Add src directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
@@ -158,13 +171,8 @@ class TestMemorySelectorConfig(unittest.TestCase):
                 self.assertEqual(os.environ.get('VALID_KEY'), 'valid_value')
                 self.assertEqual(os.environ.get('ANOTHER_VALID'), 'another_value')
                 
-                # Should have logged warning for malformed line
-                mock_logger.warning.assert_called()
-                
                 # Check that a warning about malformed line was logged
-                warning_calls = [call for call in mock_logger.warning.call_args_list 
-                               if 'Malformed line' in call.args[0]]
-                self.assertGreater(len(warning_calls), 0, "Should have logged a malformed line warning")
+                mock_logger.warning.assert_any_call(ContainsMalformedLineWarning())
                 
         finally:
             os.unlink(temp_file.name)
