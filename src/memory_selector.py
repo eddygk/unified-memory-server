@@ -9,6 +9,7 @@ import os
 import re
 import socket
 import sys
+import textwrap
 from typing import Dict, List, Optional, Any, Tuple, NamedTuple
 from enum import Enum
 import requests
@@ -1211,13 +1212,13 @@ class MemorySelector:
                 except Exception:
                     # Fallback to Cypher for relations
                     for relation in relations:
-                        cypher = f"""
+                        cypher = textwrap.dedent(f"""
                         MATCH (source {{name: $source_name}})
                         MATCH (target {{name: $target_name}})
                         CREATE (source)-[r:{relation.get('relation_type', 'RELATED_TO')}]->(target)
                         SET r += $properties
                         RETURN r
-                        """
+                        """).strip()
                         params = {
                             "source_name": relation.get("source"),
                             "target_name": relation.get("target"),
@@ -1391,27 +1392,27 @@ class MemorySelector:
                 
                 if source and target:
                     # Query for specific relationships between nodes
-                    cypher_query = f"""
+                    cypher_query = textwrap.dedent(f"""
                     MATCH (source)-[r{f':{relation_type}' if relation_type else ''}]->(target)
                     WHERE source.name = $source_name AND target.name = $target_name
                     RETURN source, r, target
-                    """
+                    """).strip()
                     parameters = {"source_name": source, "target_name": target}
                 elif source:
                     # Query for all relationships from a source
-                    cypher_query = f"""
+                    cypher_query = textwrap.dedent(f"""
                     MATCH (source)-[r{f':{relation_type}' if relation_type else ''}]->(target)
                     WHERE source.name = $source_name
                     RETURN source, r, target
-                    """
+                    """).strip()
                     parameters = {"source_name": source}
                 else:
                     # General relationship query
-                    cypher_query = f"""
+                    cypher_query = textwrap.dedent(f"""
                     MATCH (source)-[r{f':{relation_type}' if relation_type else ''}]->(target)
                     RETURN source, r, target
                     LIMIT 100
-                    """
+                    """).strip()
                     parameters = {}
                 
                 if self.cab_tracker:
