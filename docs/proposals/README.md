@@ -23,6 +23,7 @@ Each proposal should follow this structure:
 | ID | Title | Status | Date |
 |----|-------|--------|------|
 | 001 | Automated Memory System Router | Draft | 2025-01-11 |
+| 002 | Container Architecture Analysis - Monolithic vs Multiple Containers | Draft | 2025-01-11 |
 
 ## Process
 
