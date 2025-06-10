@@ -1,0 +1,237 @@
+version: '3.8'
+
+# Enhanced Docker Compose configuration demonstrating 
+# the recommended improvements from architectural analysis
+
+services:
+  # Main API Service (with dedicated Dockerfile)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: unified-memory-api
+    ports:
+      - "${SERVER_IP:-10.10.20.100}:${PORT:-8000}:8000"
+    environment:
+      - REDIS_URL=redis://default:${REDIS_PASSWORD}@redis:6379
+      - NEO4J_URL=bolt://neo4j:7687
+      - HOST=0.0.0.0
+    env_file:
+      - .env.production
+    depends_on:
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    restart: unless-stopped
+    # Enhanced health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Resource limits for small business optimization
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    volumes:
+      - ./logs:/var/log/unified-memory
+      - ${BASIC_MEMORY_PATH:-./data/obsidian}:/data/obsidian
+      - ./certs:/certs:ro
+    networks:
+      - memory-net
+
+  # MCP Server (with dedicated Dockerfile)
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: unified-memory-mcp
+    ports:
+      - "${SERVER_IP:-10.10.20.100}:${MCP_PORT:-9000}:9000"
+    environment:
+      - REDIS_URL=redis://default:${REDIS_PASSWORD}@redis:6379
+      - NEO4J_URL=bolt://neo4j:7687
+      - HOST=0.0.0.0
+    env_file:
+      - .env.production
+    depends_on:
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    restart: unless-stopped
+    # Resource limits for small business optimization
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+    networks:
+      - memory-net
+
+  # Background Task Worker (with dedicated Dockerfile)
+  task-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: unified-memory-worker
+    environment:
+      - REDIS_URL=redis://default:${REDIS_PASSWORD}@redis:6379
+      - NEO4J_URL=bolt://neo4j:7687
+    env_file:
+      - .env.production
+    depends_on:
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    restart: unless-stopped
+    # Resource limits for small business optimization  
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+    networks:
+      - memory-net
+    volumes:
+      - ./logs:/var/log/unified-memory
+      - ${BASIC_MEMORY_PATH:-./data/obsidian}:/data/obsidian
+
+  # Enhanced Health Dashboard (optional)
+  health-dashboard:
+    image: nginx:alpine
+    container_name: unified-memory-health-dashboard
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./config/health-dashboard:/usr/share/nginx/html:ro
+    networks:
+      - memory-net
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    depends_on:
+      - api
+      - mcp
+      - task-worker
+
+  # Distributed Tracing (optional for debugging)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: unified-memory-jaeger
+    ports:
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - memory-net
+    restart: unless-stopped
+    profiles:
+      - tracing
+
+  # All existing services remain unchanged
+  # (Redis, Neo4j, Nginx, Prometheus, Grafana, etc.)
+  
+  redis:
+    image: redis/redis-stack:latest
+    container_name: unified-memory-redis
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-stack-server --save 60 1 --loglevel warning --requirepass ${REDIS_PASSWORD:-your-redis-password}
+    environment:
+      - REDIS_ARGS=--requirepass ${REDIS_PASSWORD:-your-redis-password}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Resource limits for small business optimization
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    networks:
+      - memory-net
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  neo4j:
+    image: neo4j:5-enterprise
+    container_name: unified-memory-neo4j
+    environment:
+      - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-your-neo4j-password}
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+      - NEO4J_dbms_memory_pagecache_size=1G
+      - NEO4J_dbms_memory_heap_initial__size=1G
+      - NEO4J_dbms_memory_heap_max__size=2G
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_security_allow__csv__import__from__file__urls=false
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    # Resource limits for small business optimization
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    networks:
+      - memory-net
+
+  # Keep all other existing services unchanged
+  # (nginx, prometheus, grafana, redis-insight, backup)
+
+volumes:
+  redis_data:
+    driver: local
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  neo4j_import:
+    driver: local
+  neo4j_plugins:
+    driver: local
+
+networks:
+  memory-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
