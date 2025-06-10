@@ -26,6 +26,41 @@ FALLBACK_THRESHOLD = 0.3  # Confidence threshold below which fallback to legacy 
 INTERNAL_HOSTNAMES = ['basic-memory', 'neo4j', 'redis', 'localhost']  # Internal Docker hostnames
 
 
+def check_connectivity_in_test_mode(url: str, operation_name: str, test_mode: bool, service_name: str = None) -> None:
+    """
+    Check connectivity in test mode for internal hostnames.
+    
+    Args:
+        url: The URL to check connectivity for
+        operation_name: Name of the operation being performed (for logging)
+        test_mode: Whether test mode is enabled
+        service_name: Optional service name for error messages (defaults to "Server")
+        
+    Returns:
+        None if connectivity check should be skipped or server is reachable
+        
+    Raises:
+        ConnectivityError: If server is unreachable in test mode
+    """
+    if not test_mode:
+        return None
+        
+    from urllib.parse import urlparse
+    parsed_url = urlparse(url)
+    hostname = parsed_url.hostname
+    
+    # Check if the hostname is in the list of internal Docker hostnames
+    if hostname in INTERNAL_HOSTNAMES:
+        try:
+            socket.gethostbyname(hostname)
+        except (socket.gaierror, socket.error):
+            logger.warning(f"Test mode: Skipping {operation_name} to unreachable hostname '{hostname}'")
+            service_prefix = service_name if service_name else "Server"
+            raise ConnectivityError(f"Test mode: {service_prefix} at {hostname} is not reachable (expected in development/CI environment)")
+    
+    return None
+
+
 class MemorySystem(Enum):
     """Available memory systems"""
     NEO4J = "neo4j"
@@ -112,23 +147,8 @@ class Neo4jMCPClient:
     
     def _send_mcp_request(self, url: str, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """Send MCP request to specified server"""
-        # In test mode, check if the server is reachable before making the request
-        if self.test_mode:
-            # Check if the URL uses internal hostnames that might not resolve
-            from urllib.parse import urlparse
-            parsed_url = urlparse(url)
-            hostname = parsed_url.hostname
-            
-            # Check if the hostname is in the list of internal Docker hostnames
-            if hostname in INTERNAL_HOSTNAMES:
-                # Try a quick connectivity check first
-                try:
-                    import socket
-                    socket.gethostbyname(hostname)
-                except (socket.gaierror, socket.error):
-                    # Hostname doesn't resolve, raise a descriptive exception instead of trying the network call
-                    logger.warning(f"Test mode: Skipping network call to unreachable hostname '{hostname}'")
-                    raise ConnectivityError(f"Test mode: Neo4j MCP server at {hostname} is not reachable (expected in development/CI environment)")
+        # Check connectivity in test mode
+        check_connectivity_in_test_mode(url, "network call", self.test_mode, "Neo4j MCP server")
         
         payload = {
             "jsonrpc": "2.0",
@@ -222,24 +242,7 @@ class BasicMemoryClient:
         Raises:
             Exception if server is unreachable in test mode
         """
-        if not self.test_mode:
-            return None
-            
-        from urllib.parse import urlparse
-        parsed_url = urlparse(self.base_url)
-        hostname = parsed_url.hostname
-        
-        # Common internal Docker hostnames that won't resolve in development
-        internal_hostnames = ['basic-memory', 'neo4j', 'redis']
-        
-        if hostname in internal_hostnames:
-            try:
-                import socket
-                socket.gethostbyname(hostname)
-            except (socket.gaierror, socket.error):
-                logger.warning(f"Test mode: Skipping {operation_name} to unreachable hostname '{hostname}'")
-                raise ConnectivityError(f"Test mode: Basic Memory server at {hostname} is not reachable (expected in development/CI environment)")
-        
+        check_connectivity_in_test_mode(self.base_url, operation_name, self.test_mode, "Basic Memory server")
         return None
 
     def store_entity(self, data: Dict[str, Any]) -> Dict[str, Any]:
