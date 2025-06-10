@@ -326,5 +326,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Discussions: [GitHub Discussions](https://github.com/eddygk/unified-memory-server/discussions)
 
 ---
+https://eddygk.github.io/unified-memory-server/
 
 *Built with ❤️ by Eddy Kawira and Claude AI*
