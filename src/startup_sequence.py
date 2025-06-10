@@ -209,7 +209,7 @@ class StartupSequenceHandler:
             # local__neo4j-cypher__read_neo4j_cypher
             
             # Placeholder result - in real implementation would parse actual Neo4j response
-            return None  # No user found
+            raise NotImplementedError("Neo4j user search is not yet implemented.")
             
         except Exception as e:
             logger.error(f"Error searching user in Neo4j: {str(e)}")
