@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Example usage of AI Directives Integration for Claude Desktop
+Example usage of AI Directives Integration for Universal AI Assistant Support
 Demonstrates the unified memory system with MCP tool compliance
 """
 import sys
@@ -34,7 +34,7 @@ def demonstrate_ai_directives():
         
         # Execute startup sequence
         print("\n2. Executing AI Directive Startup Sequence...")
-        startup_results = integration.execute_startup_sequence("DemoUser", "Claude")
+        startup_results = integration.execute_startup_sequence("DemoUser", "Assistant")
         
         print(f"✓ Step 0 (CAB Tracking): {'✅' if startup_results.get('step_0_completed') else '❌'}")
         print(f"✓ Step 1 (User ID): {'✅' if startup_results.get('step_1_completed') else '❌'}")
@@ -119,8 +119,8 @@ def demonstrate_ai_directives():
 
 
 def show_decision_tree():
-    """Display the AI directive decision tree"""
-    print("\n📋 AI Directive Decision Tree")
+    """Display the intelligent decision tree"""
+    print("\n📋 Intelligent Decision Tree")
     print("=" * 50)
     
     decision_tree = """
@@ -147,7 +147,7 @@ def show_decision_tree():
 
 
 def show_priority_routing():
-    """Display the priority-based task routing from AI directives"""
+    """Display the priority-based task routing for optimal performance"""
     print("\n🔄 Priority-Based Task Routing")
     print("=" * 50)
     
@@ -168,7 +168,7 @@ def show_priority_routing():
 
 
 if __name__ == "__main__":
-    print("🤖 Claude Desktop AI Directives Demo")
+    print("🤖 Universal AI Assistant Integration Demo")
     print("Unified Memory Server with MCP Tool Compliance")
     print("=" * 60)
     

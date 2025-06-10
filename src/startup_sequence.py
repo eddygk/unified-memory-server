@@ -1,6 +1,7 @@
 """
 Startup Sequence Handler for AI Directives
 Implements the multi-system user identification and CAB initialization sequence
+for universal AI assistant integration
 """
 import logging
 import os
@@ -42,7 +43,7 @@ class StartupSequenceHandler:
         self.startup_completed = False
         self.user_profile_data = None
         
-    def execute_startup_sequence(self, user: str = "Unknown", primary_ai: str = "Claude") -> Dict[str, Any]:
+    def execute_startup_sequence(self, user: str = "Unknown", primary_ai: str = "Assistant") -> Dict[str, Any]:
         """
         Execute the complete startup sequence as defined in AI directives
         
@@ -272,7 +273,7 @@ class StartupSequenceHandler:
     def _sync_user_data_across_systems(self, user_data: Dict[str, Any], source: str) -> bool:
         """
         Sync user data across all systems when found in only one
-        Implements the cross-system integration rules from AI directives
+        Implements the cross-system integration rules for optimal data consistency
         """
         try:
             sync_success = True

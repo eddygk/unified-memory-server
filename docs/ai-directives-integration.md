@@ -1,22 +1,22 @@
 # AI Directives Integration Guide
 
-This document explains how the Unified Memory Server has been enhanced to align with Claude Desktop's AI directives for intelligent memory management.
+This document explains how the Unified Memory Server has been enhanced with intelligent memory management directives that work seamlessly with any AI assistant, including Claude Desktop.
 
 ## Overview
 
-The AI Directives Integration provides:
+The AI Directives Integration provides universal AI assistant support with:
 
 1. **MCP Tool Name Compliance**: All tools follow the `local__<server-name>__<tool-name>` format
-2. **Decision Tree Routing**: Implements the specific decision tree from AI directives
+2. **Decision Tree Routing**: Implements intelligent decision tree for optimal routing
 3. **Startup Sequence**: Multi-system user identification and CAB initialization
 4. **Cross-System Integration**: Intelligent data propagation and consistency
-5. **Enhanced CAB Tracking**: Directive-specific monitoring and suggestions
+5. **Enhanced CAB Tracking**: AI-specific monitoring and suggestions
 
 ## Core Components
 
 ### 1. MCPToolRouter (`src/mcp_tool_router.py`)
 
-Implements the AI directive decision tree:
+Implements the intelligent decision tree for optimal routing:
 
 ```
 ├─ Does the task involve relationships/connections between entities?
@@ -44,7 +44,7 @@ print(decision["primary_tool"].mcp_name)  # local__neo4j-memory__search_nodes
 
 ### 2. StartupSequenceHandler (`src/startup_sequence.py`)
 
-Executes the AI directive startup sequence:
+Executes the intelligent startup sequence for any AI assistant:
 
 **Step 0: Initialize CAB Tracking**
 - Create CAB suggestions file at specified location
@@ -62,7 +62,7 @@ Executes the AI directive startup sequence:
 from startup_sequence import StartupSequenceHandler
 
 handler = StartupSequenceHandler(memory_selector, cab_tracker, mcp_router)
-results = handler.execute_startup_sequence("Username", "Claude")
+results = handler.execute_startup_sequence("Username", "Assistant")
 ```
 
 ### 3. AIDirectivesIntegration (`src/ai_directives_integration.py`)
@@ -73,7 +73,7 @@ Main integration layer that enhances the existing MemorySelector:
 - Enhanced routing with directive compliance
 - Cross-system data propagation
 - MCP tool name generation and validation
-- Directive compliance assessment
+- AI assistant compliance assessment
 - Silent execution (no exposed complexity to users)
 
 **Usage:**
@@ -81,11 +81,13 @@ Main integration layer that enhances the existing MemorySelector:
 from ai_directives_integration import AIDirectivesIntegration
 
 integration = AIDirectivesIntegration(enable_startup_sequence=True)
-results = integration.execute_startup_sequence("User", "Claude")
+results = integration.execute_startup_sequence("User", "Assistant")
 routing = integration.route_with_directives("Create user relationships")
 ```
 
 ## MCP Tool Mappings
+
+All tools follow the universal MCP naming convention and work with any AI assistant that supports MCP (Model Context Protocol):
 
 ### Neo4j Memory Tools
 - `local__neo4j-memory__create_entities` (Priority 5 - Entity creation)
@@ -153,7 +155,7 @@ except Exception as e:
 
 ## CAB Tracking Integration
 
-The system logs directive-specific suggestions:
+The system logs AI assistant specific suggestions:
 
 - **MCP Intent Analysis**: Intent classification and confidence
 - **Tool Routing Decisions**: Primary tool selection and fallbacks
@@ -164,7 +166,7 @@ The system logs directive-specific suggestions:
 ## Compliance Levels
 
 1. **FULL_COMPLIANCE**: Startup sequence completed, all systems operational
-2. **PARTIAL_COMPLIANCE**: Some systems operational, partial functionality
+2. **PARTIAL_COMPLIANCE**: Some systems operational, partial functionality  
 3. **BASIC_FUNCTIONALITY**: Fallback to traditional MemorySelector behavior
 
 ## Testing
@@ -201,9 +203,9 @@ BASIC_MEMORY_PATH=/path/to/obsidian/vault
 ## Best Practices
 
 1. **Silent Execution**: Never expose system complexity to users
-2. **Tool Name Compliance**: Always use proper MCP format
+2. **Tool Name Compliance**: Always use proper MCP format for universal compatibility
 3. **CAB Tracking**: Log all optimization opportunities
-4. **Cross-System Sync**: Maintain data consistency
+4. **Cross-System Sync**: Maintain data consistency across all memory systems
 5. **Graceful Degradation**: Fall back to traditional routing if needed
 
 ## Example Usage
@@ -216,7 +218,7 @@ from ai_directives_integration import AIDirectivesIntegration
 integration = AIDirectivesIntegration(enable_startup_sequence=True)
 
 # Execute startup (silently)
-startup_results = integration.execute_startup_sequence("Alice", "Claude")
+startup_results = integration.execute_startup_sequence("Alice", "Assistant")
 
 # Route tasks using AI directives
 routing = integration.route_with_directives("Find Alice's project relationships")
@@ -241,12 +243,12 @@ print(f"Compliance level: {summary['compliance_level']}")
 
 ## Integration with Existing Code
 
-The AI directives integration is designed to enhance, not replace, existing functionality:
+The AI directives integration is designed to enhance, not replace, existing functionality and works with any AI assistant:
 
-- **MemorySelector**: Enhanced with directive routing
-- **CABTracker**: Extended with directive-specific logging
+- **MemorySelector**: Enhanced with intelligent routing
+- **CABTracker**: Extended with AI-specific logging  
 - **Existing Tests**: All continue to work
 - **Configuration**: No changes required
 - **APIs**: Backward compatible
 
-This ensures a smooth transition while adding powerful new directive-compliant capabilities.
+This ensures a smooth transition while adding powerful new capabilities for universal AI assistant integration.

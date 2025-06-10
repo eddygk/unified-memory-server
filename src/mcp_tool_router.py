@@ -1,6 +1,6 @@
 """
 MCP Tool Router for AI Directives Compliance
-Implements the specific decision tree and tool naming conventions from Claude's AI directives
+Implements intelligent decision tree routing and tool naming conventions for AI assistants
 """
 import logging
 import re
@@ -44,7 +44,7 @@ class MCPToolMapping:
 
 class MCPToolRouter:
     """
-    Routes operations to specific MCP tools using AI directive decision tree
+    Routes operations to specific MCP tools using intelligent decision tree
     Implements the decision tree:
     ├─ Does the task involve relationships/connections between entities?
     │  └─ YES → Use Neo4j tools
@@ -60,7 +60,7 @@ class MCPToolRouter:
         self.decision_patterns = self._initialize_decision_patterns()
         
     def _initialize_tool_mappings(self) -> Dict[str, MCPToolMapping]:
-        """Initialize MCP tool mappings based on AI directives"""
+        """Initialize MCP tool mappings for intelligent routing"""
         mappings = {}
         
         # Neo4j Memory Tools (Priority 1 - User identity, Priority 2 - Relationships, Priority 5 - Entity creation)
@@ -154,7 +154,7 @@ class MCPToolRouter:
     
     def analyze_task_intent(self, task: str, context: Optional[Dict[str, Any]] = None) -> Tuple[MCPToolIntent, float]:
         """
-        Analyze task intent using the AI directive decision tree
+        Analyze task intent using intelligent decision tree
         Returns the intent and confidence score
         """
         task_lower = task.lower()
@@ -210,7 +210,7 @@ class MCPToolRouter:
     def get_recommended_tools(self, intent: MCPToolIntent, operation_type: str = "read") -> List[MCPToolMapping]:
         """
         Get recommended MCP tools based on intent and operation type
-        Follows the priority-based task routing from AI directives
+        Follows the priority-based task routing for optimal performance
         """
         recommended_tools = []
         
@@ -269,7 +269,7 @@ class MCPToolRouter:
     
     def route_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Main routing function that applies the AI directive decision tree
+        Main routing function that applies the intelligent decision tree
         Returns routing decision with recommended tools and fallback chain
         """
         intent, confidence = self.analyze_task_intent(task, context)

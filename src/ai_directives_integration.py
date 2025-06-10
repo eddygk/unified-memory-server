@@ -1,7 +1,7 @@
 """
 AI Directives Integration Layer
 Integrates MCP Tool Router and Startup Sequence with existing MemorySelector
-for Claude Desktop AI Directives compliance
+for universal AI client MCP tool compliance and intelligent memory routing
 """
 import logging
 from typing import Dict, List, Optional, Any, Tuple
@@ -72,7 +72,7 @@ class AIDirectivesIntegration:
                 metrics={"startup_enabled": enable_startup_sequence}
             )
     
-    def execute_startup_sequence(self, user: str = "Unknown", primary_ai: str = "Claude") -> Dict[str, Any]:
+    def execute_startup_sequence(self, user: str = "Unknown", primary_ai: str = "Assistant") -> Dict[str, Any]:
         """
         Execute the AI directive startup sequence silently
         
