@@ -246,7 +246,7 @@ class BasicMemoryClient:
             None if server is reachable or test mode is disabled
             
         Raises:
-            Exception if server is unreachable in test mode
+            ConnectivityError if server is unreachable in test mode
         """
         check_connectivity_in_test_mode(self.base_url, operation_name, self.test_mode, "Basic Memory server")
         return None
