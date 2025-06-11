@@ -895,7 +895,9 @@ class MemorySelector:
         Raises:
             Exception: If Neo4j MCP client is not available
         """
-        if not self._get_neo4j_client():
+        # Get Neo4j client instance (performs lazy initialization and configuration validation)
+        client = self._get_neo4j_client()
+        if not client:
             if self.cab_tracker:
                 self.cab_tracker.log_suggestion(
                     "Missing Implementation",
@@ -905,7 +907,7 @@ class MemorySelector:
                 )
             raise Exception("Neo4j MCP client not available")
         
-        return self._neo4j_client
+        return client
 
     def get_task_analysis(self, task: str, context: Optional[Dict[str, Any]] = None) -> TaskAnalysis:
         """Get detailed analysis of task using enhanced intent recognition
