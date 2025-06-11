@@ -47,7 +47,7 @@ class TestStartupSequenceHandler(unittest.TestCase):
     
     def test_user_identification_fallback_chain(self):
         """Test user identification tries all systems in order"""
-        result = self.startup_handler._execute_step_1("TestUser")
+        result = self.startup_handler.force_user_identification("TestUser")
         
         self.assertIn("systems_checked", result)
         self.assertIn("user_profile_found", result)
