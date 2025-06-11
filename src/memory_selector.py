@@ -19,6 +19,11 @@ class ConnectivityError(Exception):
     """Custom exception for connectivity issues in test mode"""
     pass
 
+
+class Neo4jClientUnavailableError(Exception):
+    """Custom exception for Neo4j MCP client unavailability"""
+    pass
+
 # Initialize logger for the module
 logger = logging.getLogger(__name__)
 
@@ -905,7 +910,7 @@ class MemorySelector:
                     severity='HIGH',
                     context=f"Task: {task}"
                 )
-            raise Exception("Neo4j MCP client not available")
+            raise Neo4jClientUnavailableError("Neo4j MCP client not available")
         
         return client
 
