@@ -17,6 +17,9 @@ def demonstrate_ai_directives():
     print("🎯 AI Directives Integration Demo")
     print("=" * 50)
     
+    # Configuration for cleanup behavior - can be controlled via environment variable
+    cleanup_temp_files = os.environ.get('DEMO_CLEANUP_TEMP_FILES', 'false').lower() == 'true'
+    
     # Create temporary CAB file for demo
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as temp_file:
         cab_file = temp_file.name
@@ -112,10 +115,15 @@ def demonstrate_ai_directives():
         traceback.print_exc()
     
     finally:
-        # Clean up
+        # Clean up temporary files based on configuration
         if os.path.exists(cab_file):
-            print(f"\nCleaning up CAB file: {cab_file}")
-            # os.unlink(cab_file)  # Comment out to keep file for inspection
+            if cleanup_temp_files:
+                print(f"\nCleaning up CAB file: {cab_file}")
+                os.unlink(cab_file)
+                print("✓ Temporary file cleaned up")
+            else:
+                print(f"\nCAB file retained for inspection: {cab_file}")
+                print("  Set DEMO_CLEANUP_TEMP_FILES=true to enable automatic cleanup")
 
 
 def show_decision_tree():
