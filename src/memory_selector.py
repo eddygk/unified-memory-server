@@ -1679,16 +1679,8 @@ class MemorySelector:
         """Propagate data to Neo4j system using existing _store_in_neo4j method"""
         logger.info(f"Propagating {data_type} to Neo4j for entity {entity_id}")
         
-        # Enhance data with propagation metadata for Neo4j
-        propagation_data = {
-            **data,
-            "_propagation_metadata": {
-                "entity_id": entity_id,
-                "data_type": data_type,
-                "propagated_at": data.get("timestamp"),
-                "propagation_task": task
-            }
-        }
+        # Enhance data with propagation metadata
+        propagation_data = self._enrich_with_propagation_metadata(data, data_type, entity_id, task)
         
         # If this is relationship data, ensure proper Neo4j structure
         if data_type == "relationship" and "relations" not in propagation_data:
@@ -1707,15 +1699,7 @@ class MemorySelector:
         logger.info(f"Propagating {data_type} to Basic Memory for entity {entity_id}")
         
         # Enhance data with propagation metadata
-        propagation_data = {
-            **data,
-            "_propagation_metadata": {
-                "entity_id": entity_id,
-                "data_type": data_type,
-                "propagated_at": data.get("timestamp"),
-                "propagation_task": task
-            }
-        }
+        propagation_data = self._enrich_with_propagation_metadata(data, data_type, entity_id, task)
         
         # Ensure content is properly formatted for Basic Memory
         if "content" not in propagation_data:
