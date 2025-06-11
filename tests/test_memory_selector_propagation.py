@@ -268,6 +268,105 @@ class TestMemorySelectorPropagation(unittest.TestCase):
             self.assertNotIn(MemorySystem.NEO4J, targets)
             self.assertNotIn(MemorySystem.REDIS, targets)  # Source system excluded
 
+    def test_enrich_with_propagation_metadata_basic_functionality(self):
+        """Test that _enrich_with_propagation_metadata correctly merges data and adds metadata."""
+        with patch.dict(os.environ, self.test_config):
+            selector = MemorySelector(self.mock_cab_tracker, validate_config=False)
+            
+            # Test basic functionality with typical data
+            input_data = {
+                "user_id": "user_123",
+                "name": "John Doe",
+                "email": "john@example.com"
+            }
+            
+            result = selector._enrich_with_propagation_metadata(
+                data=input_data,
+                data_type="user_profile",
+                entity_id="user_123",
+                task="test_task"
+            )
+            
+            # Verify original data is preserved
+            self.assertEqual(result["user_id"], "user_123")
+            self.assertEqual(result["name"], "John Doe")
+            self.assertEqual(result["email"], "john@example.com")
+            
+            # Verify metadata is added
+            self.assertIn("_propagation_metadata", result)
+            metadata = result["_propagation_metadata"]
+            self.assertEqual(metadata["entity_id"], "user_123")
+            self.assertEqual(metadata["data_type"], "user_profile")
+            self.assertEqual(metadata["propagation_task"], "test_task")
+            self.assertIsNone(metadata["propagated_at"])  # No timestamp in input data
+
+    def test_enrich_with_propagation_metadata_with_timestamp(self):
+        """Test that _enrich_with_propagation_metadata preserves existing timestamp."""
+        with patch.dict(os.environ, self.test_config):
+            selector = MemorySelector(self.mock_cab_tracker, validate_config=False)
+            
+            # Test with data that contains a timestamp
+            input_data = {
+                "user_id": "user_456",
+                "timestamp": "2024-01-15T10:30:00Z",
+                "activity": "login"
+            }
+            
+            result = selector._enrich_with_propagation_metadata(
+                data=input_data,
+                data_type="activity_log",
+                entity_id="activity_789",
+                task="activity_tracking"
+            )
+            
+            # Verify timestamp is preserved in metadata
+            self.assertEqual(result["_propagation_metadata"]["propagated_at"], "2024-01-15T10:30:00Z")
+            self.assertEqual(result["_propagation_metadata"]["entity_id"], "activity_789")
+            self.assertEqual(result["_propagation_metadata"]["data_type"], "activity_log")
+
+    def test_enrich_with_propagation_metadata_none_entity_id(self):
+        """Test that _enrich_with_propagation_metadata handles None entity_id correctly."""
+        with patch.dict(os.environ, self.test_config):
+            selector = MemorySelector(self.mock_cab_tracker, validate_config=False)
+            
+            # Test with None entity_id (which is Optional[str])
+            input_data = {"global_setting": "value"}
+            
+            result = selector._enrich_with_propagation_metadata(
+                data=input_data,
+                data_type="global_config",
+                entity_id=None,
+                task="config_sync"
+            )
+            
+            # Verify None entity_id is handled correctly
+            self.assertIsNone(result["_propagation_metadata"]["entity_id"])
+            self.assertEqual(result["_propagation_metadata"]["data_type"], "global_config")
+            self.assertEqual(result["_propagation_metadata"]["propagation_task"], "config_sync")
+
+    def test_enrich_with_propagation_metadata_empty_data(self):
+        """Test that _enrich_with_propagation_metadata works with empty input data."""
+        with patch.dict(os.environ, self.test_config):
+            selector = MemorySelector(self.mock_cab_tracker, validate_config=False)
+            
+            # Test with empty dictionary
+            input_data = {}
+            
+            result = selector._enrich_with_propagation_metadata(
+                data=input_data,
+                data_type="empty_test",
+                entity_id="test_001",
+                task="empty_data_test"
+            )
+            
+            # Should only contain metadata
+            self.assertEqual(len(result), 1)
+            self.assertIn("_propagation_metadata", result)
+            metadata = result["_propagation_metadata"]
+            self.assertEqual(metadata["entity_id"], "test_001")
+            self.assertEqual(metadata["data_type"], "empty_test")
+            self.assertIsNone(metadata["propagated_at"])  # No timestamp in empty data
+
     def test_cab_tracker_logging_integration(self):
         """Test that propagation operations are properly logged to CAB tracker."""
         with patch.dict(os.environ, self.test_config):
