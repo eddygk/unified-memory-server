@@ -119,8 +119,11 @@ def demonstrate_ai_directives():
         if os.path.exists(cab_file):
             if cleanup_temp_files:
                 print(f"\nCleaning up CAB file: {cab_file}")
-                os.unlink(cab_file)
-                print("✓ Temporary file cleaned up")
+                try:
+                    os.unlink(cab_file)
+                    print("✓ Temporary file cleaned up")
+                except OSError as e:
+                    print(f"❌ Failed to clean up CAB file: {cab_file}. Error: {str(e)}")
             else:
                 print(f"\nCAB file retained for inspection: {cab_file}")
                 print("  Set DEMO_CLEANUP_TEMP_FILES=true to enable automatic cleanup")
