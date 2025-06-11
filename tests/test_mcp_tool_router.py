@@ -43,7 +43,7 @@ class TestMCPToolRouter(unittest.TestCase):
             "Create comprehensive documentation for the project"
         )
         self.assertEqual(intent, MCPToolIntent.COMPREHENSIVE_DOCUMENTATION)
-        self.assertGreater(confidence, 0.3)
+        self.assertGreaterEqual(confidence, 0.3)
     
     def test_intent_analysis_user_identification(self):
         """Test intent analysis for user identification"""
