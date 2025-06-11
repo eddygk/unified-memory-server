@@ -64,6 +64,7 @@ class TestMCPToolRouter(unittest.TestCase):
         self.assertIn("reasoning", decision)
         
         # Should route to Neo4j for relationships
+        self.assertIsNotNone(decision["primary_tool"], "Primary tool is unexpectedly None.")
         if decision["primary_tool"]:
             self.assertEqual(decision["primary_tool"].system, "neo4j")
     
