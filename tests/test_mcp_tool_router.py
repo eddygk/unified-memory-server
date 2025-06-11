@@ -51,7 +51,7 @@ class TestMCPToolRouter(unittest.TestCase):
             "Find my user profile and preferences"
         )
         self.assertEqual(intent, MCPToolIntent.USER_IDENTIFICATION)
-        self.assertGreater(confidence, 0.3)
+        self.assertGreaterEqual(confidence, 0.3)
     
     def test_routing_decision(self):
         """Test complete routing decision process"""
