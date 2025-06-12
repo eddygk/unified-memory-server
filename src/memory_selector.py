@@ -32,6 +32,22 @@ FALLBACK_THRESHOLD = 0.3  # Confidence threshold below which fallback to legacy 
 INTERNAL_HOSTNAMES = ['basic-memory', 'neo4j', 'redis', 'localhost']  # Internal Docker hostnames
 
 
+def format_cypher_query(query: str) -> str:
+    """
+    Format a Cypher query by removing common indentation and leading/trailing whitespace.
+    
+    This helper function encapsulates the repeated pattern of textwrap.dedent(...).strip()
+    used throughout the codebase for Cypher query formatting.
+    
+    Args:
+        query: The raw Cypher query string (typically an f-string with multiline content)
+        
+    Returns:
+        The formatted query string with consistent indentation removed and stripped
+    """
+    return textwrap.dedent(query).strip()
+
+
 def check_connectivity_in_test_mode(url: str, operation_name: str, test_mode: bool, service_name: str = None) -> None:
     """
     Check connectivity in test mode for internal hostnames.
@@ -1219,13 +1235,13 @@ class MemorySelector:
                 except Exception:
                     # Fallback to Cypher for relations
                     for relation in relations:
-                        cypher = textwrap.dedent(f"""
+                        cypher = format_cypher_query(f"""
                         MATCH (source {{name: $source_name}})
                         MATCH (target {{name: $target_name}})
                         CREATE (source)-[r:{relation.get('relation_type', 'RELATED_TO')}]->(target)
                         SET r += $properties
                         RETURN r
-                        """).strip()
+                        """)
                         params = {
                             "source_name": relation.get("source"),
                             "target_name": relation.get("target"),
@@ -1399,27 +1415,27 @@ class MemorySelector:
                 
                 if source and target:
                     # Query for specific relationships between nodes
-                    cypher_query = textwrap.dedent(f"""
+                    cypher_query = format_cypher_query(f"""
                     MATCH (source)-[r{f':{relation_type}' if relation_type else ''}]->(target)
                     WHERE source.name = $source_name AND target.name = $target_name
                     RETURN source, r, target
-                    """).strip()
+                    """)
                     parameters = {"source_name": source, "target_name": target}
                 elif source:
                     # Query for all relationships from a source
-                    cypher_query = textwrap.dedent(f"""
+                    cypher_query = format_cypher_query(f"""
                     MATCH (source)-[r{f':{relation_type}' if relation_type else ''}]->(target)
                     WHERE source.name = $source_name
                     RETURN source, r, target
-                    """).strip()
+                    """)
                     parameters = {"source_name": source}
                 else:
                     # General relationship query
-                    cypher_query = textwrap.dedent(f"""
+                    cypher_query = format_cypher_query(f"""
                     MATCH (source)-[r{f':{relation_type}' if relation_type else ''}]->(target)
                     RETURN source, r, target
                     LIMIT 100
-                    """).strip()
+                    """)
                     parameters = {}
                 
                 if self.cab_tracker:
