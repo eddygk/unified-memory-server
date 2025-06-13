@@ -148,7 +148,7 @@ class TestCABTrackerIntegration(unittest.TestCase):
                              if call[0][0] == "Missing Implementation"]
         self.assertGreater(len(missing_impl_calls), 0, "Missing implementations should be logged")
 
-    def test_data_inconsistency_logging_in_propagator(self):
+    def test_data_inconsistency_logging_in_memory_selector_propagation(self):
         """Test that data inconsistencies are logged in MemorySelector propagation."""
         with patch.dict(os.environ, {
             'REDIS_URL': 'redis://localhost:6379',
