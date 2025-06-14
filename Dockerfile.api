@@ -1,4 +1,4 @@
-# Base image for all services
+# API Service Dockerfile
 FROM python:3.12-slim as base
 
 # Install system dependencies
@@ -7,15 +7,12 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install UV package manager
-RUN pip install uv
-
 # Set working directory
 WORKDIR /app
 
 # Copy requirements and install dependencies
-COPY pyproject.toml uv.lock* ./
-RUN uv sync --frozen
+COPY pyproject.toml ./
+RUN pip install -e .
 
 # Copy source code
 COPY src/ ./src/
@@ -28,7 +25,8 @@ USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8000/health/ || exit 1
 
-# Default command (override in specific services)
-CMD ["uv", "run", "agent-memory", "api", "--host", "0.0.0.0", "--port", "8000"]
+# Set Python path and run API server
+ENV PYTHONPATH=/app
+CMD ["python", "-m", "src.main"]

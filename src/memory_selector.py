@@ -33,6 +33,21 @@ FALLBACK_THRESHOLD = 0.3  # Confidence threshold below which fallback to legacy 
 INTERNAL_HOSTNAMES = ['basic-memory', 'neo4j', 'redis', 'localhost']  # Internal Docker hostnames
 
 
+class MockCabTracker:
+    """Mock CAB tracker for testing and development purposes"""
+    def __init__(self):
+        self.initialized = True
+    
+    def log_suggestion(self, *args, **kwargs):
+        print(f"CAB LOG: {args} {kwargs}")
+        
+    def log_memory_operation(self, *args, **kwargs):
+        print(f"CAB MEMORY OP: {args} {kwargs}")
+        
+    def log_missing_implementation(self, *args, **kwargs):
+        print(f"CAB MISSING IMPL: {args} {kwargs}")
+
+
 def format_cypher_query(query: str) -> str:
     """
     Format a Cypher query by removing common indentation and leading/trailing whitespace.
@@ -98,18 +113,33 @@ class TaskType(Enum):
     RELATIONSHIP_QUERY = "relationship_query"
     ENTITY_CONNECTION = "entity_connection"
     GRAPH_TRAVERSAL = "graph_traversal"
+    STORE_ENTITY = "store_entity"
+    STORE_RELATION = "store_relation"
+    SEARCH_NODES = "search_nodes"
 
     # Basic Memory tasks
     DOCUMENTATION = "documentation"
     STRUCTURED_NOTE = "structured_note"
     PERSISTENT_KNOWLEDGE = "persistent_knowledge"
     MARKDOWN_CONTENT = "markdown_content"
+    STORE_NOTE = "store_note"
+    RETRIEVE_NOTE = "retrieve_note"
+    UPDATE_NOTE = "update_note"
+    SEARCH_NOTES = "search_notes"
+    STORE_CANVAS = "store_canvas"
+    DELETE_NOTE = "delete_note"
 
     # Redis tasks
     CONVERSATION_CONTEXT = "conversation_context"
     SEMANTIC_SEARCH = "semantic_search"
     PREFERENCE_STORAGE = "preference_storage"
     SESSION_DATA = "session_data"
+    STORE_MEMORY = "store_memory"
+    SEARCH_MEMORY = "search_memory"
+    RETRIEVE_MEMORY = "retrieve_memory"
+    DELETE_MEMORY = "delete_memory"
+    CREATE_SESSION = "create_session"
+    HYDRATE_PROMPT = "hydrate_prompt"
 
     # General
     UNKNOWN = "unknown"
