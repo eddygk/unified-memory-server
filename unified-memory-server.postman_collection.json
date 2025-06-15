@@ -1,0 +1,378 @@
+{
+  "info": {
+    "name": "Unified Memory Server",
+    "description": "A unified AI memory server integrating Neo4j, Basic Memory, and Redis Memory Server",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "mcpUrl",
+      "value": "http://localhost:9000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Checks",
+      "description": "System health and status endpoints",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Get overall system health status"
+          },
+          "response": []
+        },
+        {
+          "name": "Readiness Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "description": "Check if server is ready to accept requests"
+          },
+          "response": []
+        },
+        {
+          "name": "Liveness Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "live"
+              ]
+            },
+            "description": "Check if server is alive"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Neo4j Graph Database",
+      "description": "Neo4j graph database operations for entities and relationships",
+      "item": [
+        {
+          "name": "Create Entity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"type\": \"Person\",\n  \"properties\": {\n    \"email\": \"john.doe@example.com\",\n    \"role\": \"Software Engineer\",\n    \"department\": \"Engineering\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entities"
+              ]
+            },
+            "description": "Create a new entity in the Neo4j graph database"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Relationship",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from_entity\": \"John Doe\",\n  \"to_entity\": \"AI Project Alpha\",\n  \"relation_type\": \"WORKS_ON\",\n  \"properties\": {\n    \"start_date\": \"2024-01-15\",\n    \"role\": \"Lead Developer\",\n    \"commitment\": \"full-time\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/relations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "relations"
+              ]
+            },
+            "description": "Create a relationship between entities"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Graph",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"Find all people working on AI projects\",\n  \"limit\": 10,\n  \"node_types\": [\n    \"Person\",\n    \"Project\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/graph/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "graph",
+                "search"
+              ]
+            },
+            "description": "Search the graph using natural language queries"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Redis Memory Server",
+      "description": "Redis memory operations for semantic search and sessions",
+      "item": [
+        {
+          "name": "Create Memory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Python is a high-level programming language known for its simplicity and readability\",\n  \"namespace\": \"programming\",\n  \"topics\": [\n    \"python\",\n    \"programming\",\n    \"languages\"\n  ],\n  \"entities\": [\n    \"Python\"\n  ],\n  \"metadata\": {\n    \"source\": \"user_input\",\n    \"importance\": \"high\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/memories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "memories"
+              ]
+            },
+            "description": "Create a new memory in Redis memory system"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Memories",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"programming languages\",\n  \"namespace\": \"programming\",\n  \"limit\": 5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/memories/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "memories",
+                "search"
+              ]
+            },
+            "description": "Search memories using semantic search"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Basic Memory System",
+      "description": "Basic Memory operations for notes and documents",
+      "item": [
+        {
+          "name": "Create Note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Project Meeting Notes\",\n  \"content\": \"# Meeting Notes\\n\\n## Attendees\\n- John Doe\\n- Jane Smith\\n\\n## Discussion\\n- Project timeline\\n- Resource allocation\",\n  \"tags\": [\n    \"meeting\",\n    \"project\",\n    \"notes\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notes"
+              ]
+            },
+            "description": "Create a new note in Basic Memory"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Notes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"meeting notes\",\n  \"limit\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/search/notes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "search",
+                "notes"
+              ]
+            },
+            "description": "Search notes using full-text search"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "MCP Server",
+      "description": "Model Context Protocol server endpoints",
+      "item": [
+        {
+          "name": "MCP Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{mcpUrl}}/health",
+              "host": [
+                "{{mcpUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Check MCP server health"
+          },
+          "response": []
+        },
+        {
+          "name": "MCP Tools List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
+            },
+            "url": {
+              "raw": "{{mcpUrl}}/sse",
+              "host": [
+                "{{mcpUrl}}"
+              ],
+              "path": [
+                "sse"
+              ]
+            },
+            "description": "Get list of available MCP tools"
+          },
+          "response": []
+        },
+        {
+          "name": "WebSocket Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{mcpUrl}}/ws/status",
+              "host": [
+                "{{mcpUrl}}"
+              ],
+              "path": [
+                "ws",
+                "status"
+              ]
+            },
+            "description": "Get WebSocket connection status"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

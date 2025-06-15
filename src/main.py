@@ -65,11 +65,75 @@ def create_app() -> FastAPI:
     
     app = FastAPI(
         title="Unified Memory Server",
-        description="A unified AI memory server integrating Neo4j, Basic Memory, and Redis Memory Server",
+        description="""
+A unified AI memory server integrating Neo4j, Basic Memory, and Redis Memory Server.
+
+## Features
+
+- **Neo4j Graph Database**: Store and query entities and relationships
+- **Basic Memory System**: Manage notes, documents, and projects  
+- **Redis Memory Server**: Semantic search and session management
+- **Intelligent Routing**: Automatic selection of optimal memory system
+- **Fallback Support**: Automatic failover between memory systems
+- **MCP Protocol**: Model Context Protocol support for AI agents
+- **Real-time Updates**: WebSocket and SSE support
+
+## Memory Systems
+
+### Neo4j (Graph Database)
+Perfect for storing entities and relationships. Use for:
+- User profiles and connections
+- Project hierarchies and dependencies
+- Knowledge graphs and semantic networks
+
+### Basic Memory (Document Storage)
+Ideal for structured content. Use for:
+- Notes and documentation
+- Project files and resources
+- Canvas and creative work
+
+### Redis Memory (Semantic Search)
+Optimized for search and sessions. Use for:
+- Conversational memory
+- Semantic similarity search
+- Session state management
+
+## Authentication
+
+Currently running in development mode with authentication disabled.
+In production, OAuth2/JWT authentication will be required.
+        """,
         version="1.0.0",
         lifespan=lifespan,
         docs_url="/docs" if settings.ENABLE_SWAGGER_UI else None,
         redoc_url="/redoc" if settings.ENABLE_SWAGGER_UI else None,
+        contact={
+            "name": "Unified Memory Server Team",
+            "url": "https://github.com/eddygk/unified-memory-server",
+            "email": "support@memory-server.local"
+        },
+        license_info={
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        openapi_tags=[
+            {
+                "name": "health",
+                "description": "Health check and system status endpoints"
+            },
+            {
+                "name": "neo4j", 
+                "description": "Neo4j graph database operations - entities and relationships"
+            },
+            {
+                "name": "basic-memory",
+                "description": "Basic Memory system operations - notes and documents"
+            },
+            {
+                "name": "redis-memory",
+                "description": "Redis Memory operations - semantic search and sessions"
+            }
+        ]
     )
     
     # Add CORS middleware

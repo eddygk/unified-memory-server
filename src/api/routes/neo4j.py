@@ -13,9 +13,25 @@ router = APIRouter()
 
 class EntityCreate(BaseModel):
     """Entity creation request"""
-    name: str = Field(..., description="Entity name")
-    type: str = Field(..., description="Entity type")
-    properties: Dict[str, Any] = Field(default_factory=dict, description="Entity properties")
+    name: str = Field(
+        ..., 
+        description="Entity name", 
+        example="John Doe"
+    )
+    type: str = Field(
+        ..., 
+        description="Entity type", 
+        example="Person"
+    )
+    properties: Dict[str, Any] = Field(
+        default_factory=dict, 
+        description="Entity properties",
+        example={
+            "email": "john.doe@example.com",
+            "role": "Software Engineer",
+            "department": "Engineering"
+        }
+    )
 
 
 class EntityResponse(BaseModel):
@@ -28,10 +44,30 @@ class EntityResponse(BaseModel):
 
 class RelationCreate(BaseModel):
     """Relation creation request"""
-    from_entity: str = Field(..., description="Source entity name")
-    to_entity: str = Field(..., description="Target entity name")
-    relation_type: str = Field(..., description="Relationship type")
-    properties: Dict[str, Any] = Field(default_factory=dict, description="Relationship properties")
+    from_entity: str = Field(
+        ..., 
+        description="Source entity name", 
+        example="John Doe"
+    )
+    to_entity: str = Field(
+        ..., 
+        description="Target entity name", 
+        example="AI Project Alpha"
+    )
+    relation_type: str = Field(
+        ..., 
+        description="Relationship type", 
+        example="WORKS_ON"
+    )
+    properties: Dict[str, Any] = Field(
+        default_factory=dict, 
+        description="Relationship properties",
+        example={
+            "start_date": "2024-01-15",
+            "role": "Lead Developer",
+            "commitment": "full-time"
+        }
+    )
 
 
 class RelationResponse(BaseModel):
@@ -64,6 +100,20 @@ async def create_entity(
 ) -> EntityResponse:
     """
     Create a new entity in the Neo4j graph database
+    
+    Creates a new node in the Neo4j graph with the specified name, type, and properties.
+    The entity will be automatically routed to the Neo4j system based on the task type.
+    
+    **Example Usage:**
+    - Create a person: `{"name": "John Doe", "type": "Person", "properties": {"email": "john@example.com"}}`
+    - Create a project: `{"name": "AI Assistant", "type": "Project", "properties": {"status": "active"}}`
+    - Create a document: `{"name": "Requirements Doc", "type": "Document", "properties": {"version": "1.0"}}`
+    
+    **Common Entity Types:**
+    - Person, User, Team
+    - Project, Task, Milestone  
+    - Document, Note, Resource
+    - Concept, Topic, Category
     """
     try:
         # Prepare data for storage
