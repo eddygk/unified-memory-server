@@ -937,6 +937,8 @@ class MemorySelector:
         """
         Ensure Neo4j MCP client is available and return it.
         
+        Performs lazy initialization and configuration validation of the Neo4j client.
+        
         Args:
             operation_type: Type of operation (e.g., "storage", "retrieval") for logging
             task: Task context for logging
@@ -945,9 +947,8 @@ class MemorySelector:
             Neo4jMCPClient instance
             
         Raises:
-            Exception: If Neo4j MCP client is not available
+            Neo4jClientUnavailableError: If Neo4j MCP client is not available
         """
-        # Get Neo4j client instance (performs lazy initialization and configuration validation)
         client = self._get_neo4j_client()
         if not client:
             if self.cab_tracker:
