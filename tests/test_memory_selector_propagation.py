@@ -227,10 +227,12 @@ class TestMemorySelectorPropagation(unittest.TestCase):
                 # Verify propagation metadata fields are correctly populated
                 self.assertIn("_propagation_metadata", call_args)
                 metadata = call_args["_propagation_metadata"]
-                self.assertEqual(metadata["entity_id"], "rel_123")
-                self.assertEqual(metadata["data_type"], "relationship")
-                self.assertEqual(metadata["propagation_task"], "test_task")
-                self.assertIsNone(metadata["propagated_at"])  # No timestamp in input data
+                self._assert_propagation_metadata(
+                    metadata,
+                    expected_entity_id="rel_123",
+                    expected_data_type="relationship",
+                    expected_task="test_task"
+                )
 
     def test_propagate_to_basic_memory_content_formatting(self):
         """Test that _propagate_to_basic_memory properly formats content."""
