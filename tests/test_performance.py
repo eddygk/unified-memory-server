@@ -205,12 +205,11 @@ class PerformanceBenchmark:
                     "method": "tools/list",
                     "params": {}
                 })
-                mock_ws = MockWebSocket(f"test_msg_{j}")
                 response = await self.mcp_server.handle_websocket_message(mock_ws, message)
                 total_messages += 1
         
         # Clean up connections
-        for conn_id in connection_ids:
+        for conn_id, _ in connections:
             await self.mcp_server.disconnect_websocket(conn_id)
         
         end_time = time.time()
