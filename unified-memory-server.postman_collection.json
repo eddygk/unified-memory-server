@@ -33,8 +33,7 @@
                 "{{baseUrl}}"
               ],
               "path": [
-                "health",
-                ""
+                "health"
               ]
             },
             "description": "Get overall system health status"
