@@ -1724,7 +1724,11 @@ class MemorySelector:
         return self._store_in_redis(propagation_data, task, context)
 
     def _propagate_to_neo4j(self, data: Dict[str, Any], data_type: str, entity_id: Optional[str], task: str, context: Optional[Dict[str, Any]]) -> Any:
-        """Propagate data to Neo4j system using existing _store_in_neo4j method"""
+        """Propagate data to Neo4j system using existing _store_in_neo4j method.
+        
+        Data is enriched with propagation metadata via _enrich_with_propagation_metadata
+        before being stored in Neo4j for cross-system synchronization tracking.
+        """
         logger.info(f"Propagating {data_type} to Neo4j for entity {entity_id}")
         
         # Enhance data with propagation metadata
@@ -1743,7 +1747,11 @@ class MemorySelector:
         return self._store_in_neo4j(propagation_data, task, context)
 
     def _propagate_to_basic_memory(self, data: Dict[str, Any], data_type: str, entity_id: Optional[str], task: str, context: Optional[Dict[str, Any]]) -> Any:
-        """Propagate data to Basic Memory system using existing _store_in_basic_memory method"""
+        """Propagate data to Basic Memory system using existing _store_in_basic_memory method.
+        
+        Data is enriched with propagation metadata via _enrich_with_propagation_metadata
+        before being stored in Basic Memory for cross-system synchronization tracking.
+        """
         logger.info(f"Propagating {data_type} to Basic Memory for entity {entity_id}")
         
         # Enhance data with propagation metadata

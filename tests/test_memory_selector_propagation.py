@@ -223,6 +223,16 @@ class TestMemorySelectorPropagation(unittest.TestCase):
                 self.assertEqual(len(call_args["relations"]), 1)
                 self.assertEqual(call_args["relations"][0]["source"], "user_123")
                 self.assertEqual(call_args["relations"][0]["target"], "project_456")
+                
+                # Verify propagation metadata fields are correctly populated
+                self.assertIn("_propagation_metadata", call_args)
+                metadata = call_args["_propagation_metadata"]
+                self._assert_propagation_metadata(
+                    metadata,
+                    expected_entity_id="rel_123",
+                    expected_data_type="relationship",
+                    expected_task="test_task"
+                )
 
     def test_propagate_to_basic_memory_content_formatting(self):
         """Test that _propagate_to_basic_memory properly formats content."""
@@ -247,6 +257,16 @@ class TestMemorySelectorPropagation(unittest.TestCase):
                 self.assertIn("content", call_args)
                 self.assertIn("title", call_args)
                 self.assertIn("Documentation - doc_123", call_args["title"])
+                
+                # Verify propagation metadata fields are correctly populated
+                self.assertIn("_propagation_metadata", call_args)
+                self._assert_propagation_metadata(
+                    call_args["_propagation_metadata"],
+                    expected_entity_id="doc_123",
+                    expected_data_type="documentation",
+                    expected_task="test_task",
+                    expected_propagated_at=None
+                )
 
     def test_get_propagation_targets_filtering(self):
         """Test that _get_propagation_targets properly filters based on system availability."""
