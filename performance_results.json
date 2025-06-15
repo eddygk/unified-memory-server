@@ -1,0 +1,29 @@
+{
+  "timestamp": 1749957793.9467413,
+  "results": [
+    {
+      "operation": "task_analysis",
+      "total_tasks": 1000,
+      "duration_seconds": 0.03593850135803223,
+      "tasks_per_second": 27825.31163549759,
+      "avg_latency_ms": 0.03593850135803223
+    },
+    {
+      "operation": "mcp_requests",
+      "skipped": true,
+      "reason": "MCP server not available"
+    },
+    {
+      "operation": "fallback_chains",
+      "total_operations": 50,
+      "duration_seconds": 0.05849456787109375,
+      "operations_per_second": 854.7802269466545,
+      "avg_latency_ms": 1.169891357421875
+    },
+    {
+      "operation": "websocket_simulation",
+      "skipped": true,
+      "reason": "MCP server not available"
+    }
+  ]
+}

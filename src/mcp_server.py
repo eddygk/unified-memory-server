@@ -11,7 +11,7 @@ import time
 from typing import Any, Dict, List, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -28,14 +28,90 @@ class MCPServer:
     
     def __init__(self, memory_selector: MemorySelector):
         self.memory_selector = memory_selector
-        self.active_connections = set()
+        self.active_connections: Dict[str, WebSocket] = {}
+        self.connection_counter = 0
         
+    async def connect_websocket(self, websocket: WebSocket) -> str:
+        """Connect a new WebSocket client"""
+        await websocket.accept()
+        connection_id = f"conn_{self.connection_counter}"
+        self.connection_counter += 1
+        self.active_connections[connection_id] = websocket
+        logger.info(f"WebSocket client connected: {connection_id}")
+        return connection_id
+    
+    async def disconnect_websocket(self, connection_id: str):
+        """Disconnect a WebSocket client"""
+        if connection_id in self.active_connections:
+            del self.active_connections[connection_id]
+            logger.info(f"WebSocket client disconnected: {connection_id}")
+    
+    async def broadcast_event(self, event: Dict[str, Any]):
+        """Broadcast an event to all connected WebSocket clients"""
+        if not self.active_connections:
+            return
+        
+        message = json.dumps(event)
+        disconnected_clients = []
+        
+        for connection_id, websocket in self.active_connections.items():
+            try:
+                await websocket.send_text(message)
+            except Exception as e:
+                logger.warning(f"Failed to send message to {connection_id}: {e}")
+                disconnected_clients.append(connection_id)
+        
+        # Clean up disconnected clients
+        for connection_id in disconnected_clients:
+            await self.disconnect_websocket(connection_id)
+        
+    async def handle_websocket_message(self, websocket: WebSocket, message: str) -> Optional[Dict[str, Any]]:
+        """Handle incoming WebSocket message"""
+        try:
+            request_data = json.loads(message)
+            response = await self.handle_mcp_request(request_data)
+            return response
+        except json.JSONDecodeError:
+            return {
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {
+                    "code": -32700,
+                    "message": "Parse error: Invalid JSON"
+                }
+            }
+        except Exception as e:
+            logger.error(f"Error handling WebSocket message: {e}")
+            return {
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {
+                    "code": -32603,
+                    "message": f"Internal error: {str(e)}"
+                }
+            }
     async def handle_mcp_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle incoming MCP request and route to appropriate memory system"""
         try:
+            # Validate basic MCP structure
+            if not isinstance(request_data, dict):
+                return self._create_error_response(None, -32600, "Invalid Request: not a dict")
+            
             method = request_data.get("method", "")
             params = request_data.get("params", {})
             request_id = request_data.get("id", 1)
+            jsonrpc = request_data.get("jsonrpc", "")
+            
+            # Validate JSON-RPC version
+            if jsonrpc != "2.0":
+                return self._create_error_response(request_id, -32600, "Invalid Request: jsonrpc must be '2.0'")
+            
+            # Validate method
+            if not method or not isinstance(method, str):
+                return self._create_error_response(request_id, -32600, "Invalid Request: method required")
+            
+            # Log the request for monitoring
+            logger.info(f"Processing MCP request: {method} (id: {request_id})")
             
             # Route based on method name
             if method == "tools/list":
@@ -47,25 +123,26 @@ class MCPServer:
             elif method == "resources/read":
                 return await self._handle_resource_read(request_id, params)
             else:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "error": {
-                        "code": -32601,
-                        "message": f"Method not found: {method}"
-                    }
-                }
+                return self._create_error_response(request_id, -32601, f"Method not found: {method}")
                 
         except Exception as e:
             logger.error(f"Error handling MCP request: {e}")
-            return {
-                "jsonrpc": "2.0",
-                "id": request_data.get("id", 1),
-                "error": {
-                    "code": -32603,
-                    "message": f"Internal error: {str(e)}"
-                }
+            return self._create_error_response(
+                request_data.get("id", 1) if isinstance(request_data, dict) else 1,
+                -32603,
+                f"Internal error: {str(e)}"
+            )
+    
+    def _create_error_response(self, request_id: Any, code: int, message: str) -> Dict[str, Any]:
+        """Create a standardized error response"""
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {
+                "code": code,
+                "message": message
             }
+        }
     
     async def _handle_tools_list(self, request_id: int) -> Dict[str, Any]:
         """Return list of available tools"""
@@ -497,6 +574,39 @@ def create_mcp_app() -> FastAPI:
                 "Access-Control-Allow-Headers": "*",
             }
         )
+    
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for real-time MCP communication"""
+        mcp_server = websocket.app.state.mcp_server
+        connection_id = await mcp_server.connect_websocket(websocket)
+        
+        try:
+            while True:
+                # Receive message from client
+                message = await websocket.receive_text()
+                
+                # Process the message
+                response = await mcp_server.handle_websocket_message(websocket, message)
+                
+                # Send response back if needed
+                if response:
+                    await websocket.send_text(json.dumps(response))
+                    
+        except WebSocketDisconnect:
+            await mcp_server.disconnect_websocket(connection_id)
+        except Exception as e:
+            logger.error(f"WebSocket error: {e}")
+            await mcp_server.disconnect_websocket(connection_id)
+    
+    @app.get("/ws/status")
+    async def websocket_status(request: Request):
+        """Get WebSocket connection status"""
+        mcp_server = request.app.state.mcp_server
+        return {
+            "active_connections": len(mcp_server.active_connections),
+            "connection_ids": list(mcp_server.active_connections.keys())
+        }
     
     return app
 
