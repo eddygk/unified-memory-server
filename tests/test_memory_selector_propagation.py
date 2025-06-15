@@ -260,11 +260,13 @@ class TestMemorySelectorPropagation(unittest.TestCase):
                 
                 # Verify propagation metadata fields are correctly populated
                 self.assertIn("_propagation_metadata", call_args)
-                metadata = call_args["_propagation_metadata"]
-                self.assertEqual(metadata["entity_id"], "doc_123")
-                self.assertEqual(metadata["data_type"], "documentation")
-                self.assertEqual(metadata["propagation_task"], "test_task")
-                self.assertIsNone(metadata["propagated_at"])  # No timestamp in input data
+                self._assert_propagation_metadata(
+                    call_args["_propagation_metadata"],
+                    expected_entity_id="doc_123",
+                    expected_data_type="documentation",
+                    expected_task="test_task",
+                    expected_propagated_at=None
+                )
 
     def test_get_propagation_targets_filtering(self):
         """Test that _get_propagation_targets properly filters based on system availability."""
