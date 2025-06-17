@@ -40,23 +40,8 @@ class TestAIDirectivesDemoCleanup(unittest.TestCase):
         # Set environment variable to enable cleanup
         os.environ['DEMO_CLEANUP_TEMP_FILES'] = 'true'
         
-        # Mock the integration and tracker to avoid actual initialization
-        mock_integration_instance = MagicMock()
-        mock_integration.return_value = mock_integration_instance
-        mock_integration_instance.execute_startup_sequence.return_value = {
-            'step_0_completed': True,
-            'step_1_completed': True,
-            'user_profile_found': False
-        }
-        mock_integration_instance.route_with_directives.return_value = {
-            'mcp_decision': {'intent': 'test', 'confidence': 0.8}
-        }
-        mock_integration_instance.get_mcp_tool_name.return_value = 'test_tool'
-        mock_integration_instance.validate_mcp_compliance.return_value = True
-        mock_integration_instance.get_directive_summary.return_value = {
-            'compliance_level': 'FULL_COMPLIANCE',
-            'tool_naming_compliant': True
-        }
+        # Use pre-configured mock integration instance
+        mock_integration.return_value = self.mock_integration_instance
         
         # Capture print output to verify cleanup messages
         with patch('builtins.print') as mock_print:
