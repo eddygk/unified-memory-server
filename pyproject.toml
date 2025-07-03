@@ -5,7 +5,7 @@ description = "Unified AI memory server integrating Neo4j, Basic Memory, and Red
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Eddy Kawira", email = "eddy@example.com"},
+    {name = "eddygk"},
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -51,7 +51,7 @@ packages = ["src"]
 
 [tool.black]
 line-length = 88
-target-version = ['py312']
+target-version = ['py311']
 
 [tool.isort]
 profile = "black"
