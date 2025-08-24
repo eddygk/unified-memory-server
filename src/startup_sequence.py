@@ -195,7 +195,25 @@ class StartupSequenceHandler:
         return result
     
     def _search_user_in_neo4j(self, user: str) -> Optional[Dict[str, Any]]:
-        """Search for user profile in Neo4j using natural language query"""
+        """
+        Search for user profile in Neo4j using natural language query.
+        
+        Args:
+            user: Username to search for in the Neo4j database
+            
+        Returns:
+            Optional[Dict[str, Any]]: User profile data with relationships if found,
+            None if user not found or on error. Expected structure:
+            {
+                'user': {...},  # User node properties
+                'profiles': [...],  # Associated profile nodes
+                'relations': [...]  # Relationships to profiles
+            }
+            
+        Note:
+            This is a placeholder method that will use the MCP tool
+            'local__neo4j-cypher__read_neo4j_cypher' in the full implementation.
+        """
         try:
             # Use Neo4j cypher query for user profile search
             query = f"""
@@ -208,13 +226,7 @@ class StartupSequenceHandler:
             # In real implementation, would call the MCP tool:
             # local__neo4j-cypher__read_neo4j_cypher
             
-            # TODO: Implement Neo4j user search functionality
-            # Implementation plan:
-            # 1. Use the MCP Neo4j Cypher tool (local__neo4j-cypher__read_neo4j_cypher)
-            # 2. Execute the constructed Cypher query to search for user profile
-            # 3. Parse the Neo4j response to extract user data and relationships
-            # 4. Return structured user profile data for cross-system synchronization
-            # Timeline: This should be implemented as part of the full MCP integration phase
+            # TODO: Implement Neo4j user search using local__neo4j-cypher__read_neo4j_cypher MCP tool
             # Placeholder result - in real implementation would parse actual Neo4j response
             raise NotImplementedError("Neo4j user search is not yet implemented.")
             
@@ -241,13 +253,7 @@ class StartupSequenceHandler:
                 "limit": 10
             }
             
-            # TODO: Implement Redis user search functionality
-            # Implementation plan:
-            # 1. Use the MCP Redis Memory tool (local__redis-memory-server__search_long_term_memory)
-            # 2. Send the constructed search_payload to find user profiles in user_profile namespace
-            # 3. Process the search results to extract relevant user data and preferences
-            # 4. Return user profile data for startup sequence and cross-system sync
-            # Timeline: This should be implemented alongside Redis Memory integration
+            # TODO: Implement Redis user search using local__redis-memory-server__search_long_term_memory MCP tool
             # Placeholder result - in real implementation would call actual Redis search
             raise NotImplementedError("The '_search_user_in_redis' method is a placeholder and must be implemented.")
             
@@ -270,13 +276,7 @@ class StartupSequenceHandler:
             
             search_query = f"user identity {user}"
             
-            # TODO: Implement Basic Memory search functionality
-            # Implementation plan:
-            # 1. Use the MCP Basic Memory tool (local__basic-memory__search_notes)
-            # 2. Search for user identity notes using the constructed search_query
-            # 3. Parse search results to extract user identity information from markdown notes
-            # 4. Return structured user data for startup sequence processing
-            # Timeline: This should be implemented as part of Basic Memory MCP integration
+            # TODO: Implement Basic Memory search using local__basic-memory__search_notes MCP tool
             # Placeholder result - in real implementation would call actual Basic Memory search
             raise NotImplementedError("Basic Memory search is not yet implemented.")
             
